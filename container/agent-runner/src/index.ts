@@ -17,6 +17,7 @@
 import fs from 'fs';
 import path from 'path';
 import { query, HookCallback, PreCompactHookInput } from '@anthropic-ai/claude-agent-sdk';
+import { createSanitizeBashHook, createSecretPathBlockHook, SECRET_ENV_VARS } from './security-hooks.js';
 import { fileURLToPath } from 'url';
 
 interface ContainerInput {
@@ -26,6 +27,7 @@ interface ContainerInput {
   chatJid: string;
   isMain: boolean;
   isScheduledTask?: boolean;
+  secrets?: Record<string, string>;
 }
 
 interface ContainerOutput {
@@ -183,6 +185,7 @@ function createPreCompactHook(): HookCallback {
   };
 }
 
+
 function sanitizeFilename(summary: string): string {
   return summary
     .toLowerCase()
@@ -333,6 +336,7 @@ async function runQuery(
   sessionId: string | undefined,
   mcpServerPath: string,
   containerInput: ContainerInput,
+  sdkEnv: Record<string, string | undefined>,
   resumeAt?: string,
 ): Promise<{ newSessionId?: string; lastAssistantUuid?: string; closedDuringQuery: boolean }> {
   const stream = new MessageStream();
@@ -390,6 +394,7 @@ async function runQuery(
         'NotebookEdit',
         'mcp__nanoclaw__*'
       ],
+      env: sdkEnv,
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
       settingSources: ['project', 'user'],
@@ -405,7 +410,11 @@ async function runQuery(
         },
       },
       hooks: {
-        PreCompact: [{ hooks: [createPreCompactHook()] }]
+        PreCompact: [{ hooks: [createPreCompactHook()] }],
+        PreToolUse: [
+          { matcher: 'Bash', hooks: [createSanitizeBashHook()] },
+          { matcher: 'Read', hooks: [createSecretPathBlockHook()] },
+        ],
       },
     }
   })) {
@@ -450,6 +459,8 @@ async function main(): Promise<void> {
   try {
     const stdinData = await readStdin();
     containerInput = JSON.parse(stdinData);
+    // Delete temp file immediately — it contains secrets from stdin
+    try { fs.unlinkSync('/tmp/input.json'); } catch { /* may not exist */ }
     log(`Received input for group: ${containerInput.groupFolder}`);
   } catch (err) {
     writeOutput({
@@ -458,6 +469,13 @@ async function main(): Promise<void> {
       error: `Failed to parse input: ${err instanceof Error ? err.message : String(err)}`
     });
     process.exit(1);
+  }
+
+  // Build SDK env: merge secrets into process.env for the SDK only.
+  // Secrets never touch process.env itself, so Bash subprocesses can't see them.
+  const sdkEnv: Record<string, string | undefined> = { ...process.env };
+  for (const [key, value] of Object.entries(containerInput.secrets || {})) {
+    sdkEnv[key] = value;
   }
 
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -486,7 +504,7 @@ async function main(): Promise<void> {
     while (true) {
       log(`Starting query (session: ${sessionId || 'new'}, resumeAt: ${resumeAt || 'latest'})...`);
 
-      const queryResult = await runQuery(prompt, sessionId, mcpServerPath, containerInput, resumeAt);
+      const queryResult = await runQuery(prompt, sessionId, mcpServerPath, containerInput, sdkEnv, resumeAt);
       if (queryResult.newSessionId) {
         sessionId = queryResult.newSessionId;
       }
