@@ -27,8 +27,8 @@ container ls -a --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
 # 4. Recent errors in service log?
 grep -E 'ERROR|WARN' logs/nanoclaw.log | tail -20
 
-# 5. Is WhatsApp connected? (look for last connection event)
-grep -E 'Connected to WhatsApp|Connection closed|connection.*close' logs/nanoclaw.log | tail -5
+# 5. Is Telegram bot connected? (look for last connection event)
+grep -E 'Telegram bot connected|Telegram bot error|bot.*connected' logs/nanoclaw.log | tail -5
 
 # 6. Are groups loaded?
 grep 'groupCount' logs/nanoclaw.log | tail -3
@@ -77,8 +77,8 @@ grep -E 'Scheduling retry|retry|Max retries' logs/nanoclaw.log | tail -10
 ## Agent Not Responding
 
 ```bash
-# Check if messages are being received from WhatsApp
-grep 'New messages' logs/nanoclaw.log | tail -10
+# Check if messages are being received from Telegram
+grep -E 'New messages|Telegram message stored' logs/nanoclaw.log | tail -10
 
 # Check if messages are being processed (container spawned)
 grep -E 'Processing messages|Spawning container' logs/nanoclaw.log | tail -10
@@ -110,17 +110,21 @@ sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;
 container run -i --rm --entrypoint ls nanoclaw-agent:latest /workspace/extra/
 ```
 
-## WhatsApp Auth Issues
+## Telegram Bot Issues
 
 ```bash
-# Check if QR code was requested (means auth expired)
-grep 'QR\|authentication required\|qr' logs/nanoclaw.log | tail -5
+# Verify bot token is valid
+TOKEN=$(grep "^TELEGRAM_BOT_TOKEN=" .env | cut -d= -f2)
+curl -s "https://api.telegram.org/bot${TOKEN}/getMe" | python3 -m json.tool
 
-# Check auth files exist
-ls -la store/auth/
+# Check if bot is polling
+grep -E 'Telegram bot|grammy' logs/nanoclaw.log | tail -10
 
-# Re-authenticate if needed
-npm run auth
+# Check registered Telegram chats
+sqlite3 store/messages.db "SELECT * FROM registered_groups WHERE jid LIKE 'tg:%'"
+
+# Ensure .env is synced to container
+diff .env data/env/env
 ```
 
 ## Service Management

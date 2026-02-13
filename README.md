@@ -40,13 +40,13 @@ Then run `/setup`. Claude Code handles everything: dependencies, authentication,
 
 **AI-native.** No installation wizard; Claude Code guides setup. No monitoring dashboard; ask Claude what's happening. No debugging tools; describe the problem, Claude fixes it.
 
-**Skills over features.** Contributors shouldn't add features (e.g. support for Telegram) to the codebase. Instead, they contribute [claude code skills](https://code.claude.com/docs/en/skills) like `/add-telegram` that transform your fork. You end up with clean code that does exactly what you need.
+**Skills over features.** Contributors shouldn't add features (e.g. support for Slack) to the codebase. Instead, they contribute [claude code skills](https://code.claude.com/docs/en/skills) like `/add-slack` that transform your fork. You end up with clean code that does exactly what you need.
 
 **Best harness, best model.** This runs on Claude Agent SDK, which means you're running Claude Code directly. The harness matters. A bad harness makes even smart models seem dumb, a good harness gives them superpowers. Claude Code is (IMO) the best harness available.
 
 ## What It Supports
 
-- **WhatsApp I/O** - Message Claude from your phone
+- **Telegram I/O** - Message your agent from your phone (WhatsApp also supported via `/add-whatsapp` skill)
 - **Isolated group context** - Each group has its own `CLAUDE.md` memory, isolated filesystem, and runs in its own container sandbox with only that filesystem mounted
 - **Main channel** - Your private channel (self-chat) for admin control; every other group is completely isolated
 - **Scheduled tasks** - Recurring jobs that run Claude and can message you back
@@ -75,7 +75,7 @@ The web server runs inside the same Node.js process as everything else — no se
 
 - **REST API** (`/api/*`) for reads and mutations — calls `db.ts` functions directly
 - **WebSocket** (`/ws`) for live events and chat streaming
-- **Chat** sends messages through the same `GroupQueue` and `runContainerAgent` pipeline as WhatsApp/Telegram messages, using a `web@chat` pseudo-JID
+- **Chat** sends messages through the same `GroupQueue` and `runContainerAgent` pipeline as Telegram/WhatsApp messages, using a `web@chat` pseudo-JID
 
 To rebuild the frontend after changes:
 
@@ -119,16 +119,15 @@ The codebase is small enough that Claude can safely modify it.
 
 **Don't add features. Add skills.**
 
-If you want to add Telegram support, don't create a PR that adds Telegram alongside WhatsApp. Instead, contribute a skill file (`.claude/skills/add-telegram/SKILL.md`) that teaches Claude Code how to transform a NanoClaw installation to use Telegram.
+If you want to add Slack support, don't create a PR that adds Slack alongside Telegram. Instead, contribute a skill file (`.claude/skills/add-slack/SKILL.md`) that teaches Claude Code how to transform a NanoClaw installation to use Slack.
 
-Users then run `/add-telegram` on their fork and get clean code that does exactly what they need, not a bloated system trying to support every use case.
+Users then run `/add-slack` on their fork and get clean code that does exactly what they need, not a bloated system trying to support every use case.
 
 ### RFS (Request for Skills)
 
 Skills we'd love to see:
 
 **Communication Channels**
-- `/add-telegram` - Add Telegram as channel. Should give the user option to replace WhatsApp or add as additional channel. Also should be possible to add it as a control channel (where it can trigger actions) or just a channel that can be used in actions triggered elsewhere
 - `/add-slack` - Add Slack
 - `/add-discord` - Add Discord
 
@@ -144,11 +143,12 @@ Skills we'd love to see:
 - Node.js 20+
 - [Claude Code](https://claude.ai/download)
 - [Apple Container](https://github.com/apple/container) (macOS) or [Docker](https://docker.com/products/docker-desktop) (macOS/Linux)
+- A Telegram account (for creating a bot via [@BotFather](https://t.me/BotFather))
 
 ## Architecture
 
 ```
-Channels (WhatsApp/Telegram) --> SQLite --> Polling loop --> Container (Claude Agent SDK) --> Response
+Channels (Telegram/WhatsApp) --> SQLite --> Polling loop --> Container (Claude Agent SDK) --> Response
 WebUI (localhost:3100)       --> REST API / WebSocket ----^
 ```
 
@@ -156,7 +156,7 @@ Single Node.js process. Agents execute in isolated Linux containers with mounted
 
 Key files:
 - `src/index.ts` - Orchestrator: state, message loop, agent invocation
-- `src/channels/whatsapp.ts` - WhatsApp connection, auth, send/receive
+- `src/channels/telegram.ts` - Telegram bot connection, send/receive
 - `src/ipc.ts` - IPC watcher and task processing
 - `src/router.ts` - Message formatting and outbound routing
 - `src/group-queue.ts` - Per-group queue with global concurrency limit
@@ -169,9 +169,9 @@ Key files:
 
 ## FAQ
 
-**Why WhatsApp and not Telegram/Signal/etc?**
+**Why Telegram and not WhatsApp/Signal/etc?**
 
-Because I use WhatsApp. Fork it and run a skill to change it. That's the whole point.
+Telegram has an official bot API, making it the most reliable and easiest to set up. WhatsApp is also supported — run `/add-whatsapp` to add or switch to it. That's the whole point of the skills system.
 
 **Why Apple Container instead of Docker?**
 
