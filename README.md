@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/nanoclaw-logo.png" alt="NanoClaw Hard Shell" width="400">
+  <img src="assets/nanoclaw-hard-shell-logo.png" alt="NanoClaw Hard Shell" width="400">
 </p>
 
 <p align="center">
