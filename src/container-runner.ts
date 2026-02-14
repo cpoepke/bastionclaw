@@ -281,6 +281,8 @@ export async function runContainerAgent(
       containerName,
       mountCount: mounts.length,
       isMain: input.isMain,
+      chatJid: input.chatJid,
+      prompt: input.prompt,
     },
     'Spawning container agent',
   );
