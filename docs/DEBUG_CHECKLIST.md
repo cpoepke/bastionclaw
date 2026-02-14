@@ -18,11 +18,16 @@ Both timers fire at the same time, so containers always exit via hard SIGKILL (c
 launchctl list | grep nanoclaw
 # Expected: PID  0  com.nanoclaw (PID = running, "-" = not running, non-zero exit = crashed)
 
-# 2. Any running containers?
-container ls --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
+# 2. Detect runtime
+RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
+echo "Runtime: $RUNTIME"
 
-# 3. Any stopped/orphaned containers?
-container ls -a --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
+# 3. Any running/orphaned containers?
+if [ "$RUNTIME" = "container" ]; then
+  container ls -a --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
+else
+  docker ps -a --format '{{.Names}} {{.Status}}' --filter "name=nanoclaw-" 2>/dev/null
+fi
 
 # 4. Recent errors in service log?
 grep -E 'ERROR|WARN' logs/nanoclaw.log | tail -20
@@ -106,8 +111,8 @@ cat ~/.config/nanoclaw/mount-allowlist.json
 sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;"
 
 # Test-run a container to check mounts (dry run)
-# Replace <group-folder> with the group's folder name
-container run -i --rm --entrypoint ls nanoclaw-agent:latest /workspace/extra/
+RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
+$RUNTIME run --rm --entrypoint ls nanoclaw-agent:latest /workspace/extra/
 ```
 
 ## Telegram Bot Issues
@@ -123,8 +128,9 @@ grep -E 'Telegram bot|grammy' logs/nanoclaw.log | tail -10
 # Check registered Telegram chats
 sqlite3 store/messages.db "SELECT * FROM registered_groups WHERE jid LIKE 'tg:%'"
 
-# Ensure .env is synced to container
-diff .env data/env/env
+# Secrets are passed via stdin JSON (not env vars or mounted files)
+# Check for auth errors in container logs:
+ls -t groups/main/logs/container-*.log | head -1 | xargs grep -i "auth\|login\|key\|token" 2>/dev/null | tail -5
 ```
 
 ## Service Management
@@ -140,4 +146,4 @@ diff .env data/env/env
 tail -f logs/nanoclaw.log
 ```
 
-**Note:** Always prefer `scripts/restart.sh` over raw launchctl commands. Raw `launchctl kickstart -k` leaves orphaned containers running and can cause port conflicts (EADDRINUSE on 3100).
+**Note:** Always prefer `scripts/restart.sh` over raw launchctl/systemctl commands. Raw service restarts leave orphaned containers running and can cause port conflicts (EADDRINUSE on 3100). The restart script auto-detects Apple Container vs Docker and launchd vs systemd.

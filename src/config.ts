@@ -1,3 +1,4 @@
+import { execSync } from 'child_process';
 import path from 'path';
 
 export const ASSISTANT_NAME = process.env.ASSISTANT_NAME || 'Andy';
@@ -60,3 +61,17 @@ export const TIMEZONE =
 // WebUI
 export const WEBUI_PORT = parseInt(process.env.WEBUI_PORT || '3100', 10);
 export const WEBUI_HOST = process.env.WEBUI_HOST || '127.0.0.1';
+
+// Container runtime detection: Apple Container (macOS) or Docker
+let _detectedRuntime: 'container' | 'docker' | null = null;
+
+export function getContainerRuntime(): 'container' | 'docker' {
+  if (_detectedRuntime) return _detectedRuntime;
+  try {
+    execSync('container --version', { stdio: 'pipe' });
+    _detectedRuntime = 'container';
+  } catch {
+    _detectedRuntime = 'docker';
+  }
+  return _detectedRuntime;
+}

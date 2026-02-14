@@ -14,6 +14,7 @@ import {
   DATA_DIR,
   GROUPS_DIR,
   IDLE_TIMEOUT,
+  getContainerRuntime,
 } from './config.js';
 import { logger } from './logger.js';
 import { validateAdditionalMounts } from './mount-security.js';
@@ -213,20 +214,30 @@ function readSecrets(): Record<string, string> {
 }
 
 function buildContainerArgs(mounts: VolumeMount[], containerName: string): string[] {
+  const runtime = getContainerRuntime();
   const args: string[] = ['run', '-i', '--rm', '--name', containerName];
 
   // Resource limits: prevent CPU/memory exhaustion from runaway or malicious processes
   args.push('--cpus', '2', '--memory', '512M');
 
-  // Apple Container: --mount for readonly, -v for read-write
   for (const mount of mounts) {
-    if (mount.readonly) {
-      args.push(
-        '--mount',
-        `type=bind,source=${mount.hostPath},target=${mount.containerPath},readonly`,
-      );
+    if (runtime === 'container') {
+      // Apple Container: --mount for readonly, -v for read-write
+      if (mount.readonly) {
+        args.push(
+          '--mount',
+          `type=bind,source=${mount.hostPath},target=${mount.containerPath},readonly`,
+        );
+      } else {
+        args.push('-v', `${mount.hostPath}:${mount.containerPath}`);
+      }
     } else {
-      args.push('-v', `${mount.hostPath}:${mount.containerPath}`);
+      // Docker: -v with :ro suffix for readonly
+      if (mount.readonly) {
+        args.push('-v', `${mount.hostPath}:${mount.containerPath}:ro`);
+      } else {
+        args.push('-v', `${mount.hostPath}:${mount.containerPath}`);
+      }
     }
   }
 
@@ -278,7 +289,8 @@ export async function runContainerAgent(
   fs.mkdirSync(logsDir, { recursive: true });
 
   return new Promise((resolve) => {
-    const container = spawn('container', containerArgs, {
+    const runtime = getContainerRuntime();
+    const container = spawn(runtime, containerArgs, {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
@@ -385,7 +397,7 @@ export async function runContainerAgent(
     const killOnTimeout = () => {
       timedOut = true;
       logger.error({ group: group.name, containerName }, 'Container timeout, stopping gracefully');
-      exec(`container stop ${containerName}`, { timeout: 15000 }, (err) => {
+      exec(`${getContainerRuntime()} stop ${containerName}`, { timeout: 15000 }, (err) => {
         if (err) {
           logger.warn({ group: group.name, containerName, err }, 'Graceful stop failed, force killing');
           container.kill('SIGKILL');

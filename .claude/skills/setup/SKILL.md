@@ -467,7 +467,30 @@ Tell the user:
 > ```
 > The folder appears inside the container at `/workspace/extra/<folder-name>` (derived from the last segment of the path). Add `"readonly": false` for write access, or `"containerPath": "custom-name"` to override the default name.
 
-## 8. Configure launchd Service
+## 8. Build and Configure Service
+
+### 8a. Build everything
+
+```bash
+# Build host TypeScript
+npm run build
+
+# Build WebUI frontend
+cd ui && npm install && npm run build && cd ..
+
+# Create logs directory
+mkdir -p logs
+```
+
+### 8b. Configure background service
+
+First, detect the platform:
+
+```bash
+echo "Platform: $(uname -s)"
+```
+
+#### macOS (launchd)
 
 Generate the plist file with correct paths automatically:
 
@@ -514,17 +537,66 @@ echo "  Node: ${NODE_PATH}"
 echo "  Project: ${PROJECT_PATH}"
 ```
 
-Build and start the service:
+Start the service:
 
 ```bash
-npm run build
-mkdir -p logs
 launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist
 ```
 
 Verify it's running:
 ```bash
 launchctl list | grep nanoclaw
+```
+
+#### Linux (systemd user service)
+
+Generate the systemd unit file:
+
+```bash
+NODE_PATH=$(which node)
+PROJECT_PATH=$(pwd)
+
+mkdir -p ~/.config/systemd/user
+
+cat > ~/.config/systemd/user/nanoclaw.service << EOF
+[Unit]
+Description=NanoClaw Hard Shell
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=${PROJECT_PATH}
+ExecStart=${NODE_PATH} ${PROJECT_PATH}/dist/index.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:${PROJECT_PATH}/logs/nanoclaw.log
+StandardError=append:${PROJECT_PATH}/logs/nanoclaw.error.log
+
+[Install]
+WantedBy=default.target
+EOF
+
+echo "Created systemd user service"
+```
+
+Enable and start the service:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable nanoclaw
+systemctl --user start nanoclaw
+```
+
+Enable lingering so the service runs even when you're not logged in:
+
+```bash
+loginctl enable-linger $(whoami)
+```
+
+Verify it's running:
+```bash
+systemctl --user status nanoclaw
 ```
 
 ## 9. Test
@@ -578,9 +650,10 @@ The user should receive a response in their messaging app.
 **WhatsApp disconnected**:
 - The service will show a macOS notification
 - Run `npm run auth` to re-authenticate
-- Restart the service: `launchctl kickstart -k gui/$(id -u)/com.nanoclaw`
+- Restart the service: `./scripts/restart.sh`
 
-**Unload service**:
+**Restart the service (any platform)**:
 ```bash
-launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist
+./scripts/restart.sh          # Quick restart
+./scripts/restart.sh --build  # Rebuild everything first
 ```

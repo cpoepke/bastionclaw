@@ -10,12 +10,12 @@ This guide covers debugging the containerized agent execution system.
 ## Architecture Overview
 
 ```
-Host (macOS)                          Container (Linux VM)
+Host (macOS/Linux)                    Container (Linux VM)
 ─────────────────────────────────────────────────────────────
 src/container-runner.ts               container/agent-runner/
     │                                      │
-    │ spawns Apple Container               │ runs Claude Agent SDK
-    │ with volume mounts                   │ with MCP servers
+    │ spawns container (auto-detects       │ runs Claude Agent SDK
+    │ Apple Container or Docker)           │ with MCP servers
     │                                      │
     ├── data/env/env ──────────────> /workspace/env-dir/env
     ├── groups/{folder} ───────────> /workspace/group
@@ -78,36 +78,24 @@ cat .env  # Should show one of:
 ```
 **Fix:** Container must run as non-root user. Check Dockerfile has `USER node`.
 
-### 2. Environment Variables Not Passing
+### 2. Environment Variables / Secrets
 
-**Apple Container Bug:** Environment variables passed via `-e` are lost when using `-i` (interactive/piped stdin).
+Secrets (CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY) are passed via stdin JSON, not as env vars or mounted files. The container deletes the temp input file immediately after reading it.
 
-**Workaround:** The system extracts only authentication variables (`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`) from `.env` and mounts them for sourcing inside the container. Other env vars are not exposed.
-
-To verify env vars are reaching the container:
-```bash
-echo '{}' | container run -i \
-  --mount type=bind,source=$(pwd)/data/env,target=/workspace/env-dir,readonly \
-  --entrypoint /bin/bash nanoclaw-agent:latest \
-  -c 'export $(cat /workspace/env-dir/env | xargs); echo "OAuth: ${#CLAUDE_CODE_OAUTH_TOKEN} chars, API: ${#ANTHROPIC_API_KEY} chars"'
-```
+To verify secrets are being read correctly, check the container logs for authentication errors.
 
 ### 3. Mount Issues
 
-**Apple Container quirks:**
-- Only mounts directories, not individual files
-- `-v` syntax does NOT support `:ro` suffix - use `--mount` for readonly:
-  ```bash
-  # Readonly: use --mount
-  --mount "type=bind,source=/path,target=/container/path,readonly"
+**Runtime differences:**
+- **Apple Container:** Only mounts directories, not individual files. Uses `--mount` for readonly, `-v` for read-write.
+- **Docker:** Supports both files and directories. Uses `-v path:path:ro` for readonly.
 
-  # Read-write: use -v
-  -v /path:/container/path
-  ```
+NanoClaw auto-detects which runtime you're using and applies the correct mount syntax.
 
-To check what's mounted inside a container:
+To check what's mounted inside a container, first detect your runtime:
 ```bash
-container run --rm --entrypoint /bin/bash nanoclaw-agent:latest -c 'ls -la /workspace/'
+RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
+$RUNTIME run --rm --entrypoint /bin/bash nanoclaw-agent:latest -c 'ls -la /workspace/'
 ```
 
 Expected structure:
@@ -129,7 +117,8 @@ Expected structure:
 
 The container runs as user `node` (uid 1000). Check ownership:
 ```bash
-container run --rm --entrypoint /bin/bash nanoclaw-agent:latest -c '
+RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
+$RUNTIME run --rm --entrypoint /bin/bash nanoclaw-agent:latest -c '
   whoami
   ls -la /workspace/
   ls -la /app/
@@ -152,7 +141,8 @@ grep -A3 "Claude sessions" src/container-runner.ts
 
 **Verify sessions are accessible:**
 ```bash
-container run --rm --entrypoint /bin/bash \
+RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
+$RUNTIME run --rm --entrypoint /bin/bash \
   -v ~/.claude:/home/node/.claude \
   nanoclaw-agent:latest -c '
 echo "HOME=$HOME"
@@ -175,34 +165,24 @@ If an MCP server fails to start, the agent may exit. Check the container logs fo
 
 ## Manual Container Testing
 
+For all commands below, first detect your runtime:
+```bash
+RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
+```
+
 ### Test the full agent flow:
 ```bash
-# Set up env file
-mkdir -p data/env groups/test
-cp .env data/env/env
-
-# Run test query
+mkdir -p groups/test
 echo '{"prompt":"What is 2+2?","groupFolder":"test","chatJid":"test@g.us","isMain":false}' | \
-  container run -i \
-  --mount "type=bind,source=$(pwd)/data/env,target=/workspace/env-dir,readonly" \
+  $RUNTIME run -i \
   -v $(pwd)/groups/test:/workspace/group \
   -v $(pwd)/data/ipc:/workspace/ipc \
   nanoclaw-agent:latest
 ```
 
-### Test Claude Code directly:
-```bash
-container run --rm --entrypoint /bin/bash \
-  --mount "type=bind,source=$(pwd)/data/env,target=/workspace/env-dir,readonly" \
-  nanoclaw-agent:latest -c '
-  export $(cat /workspace/env-dir/env | xargs)
-  claude -p "Say hello" --dangerously-skip-permissions --allowedTools ""
-'
-```
-
 ### Interactive shell in container:
 ```bash
-container run --rm -it --entrypoint /bin/bash nanoclaw-agent:latest
+$RUNTIME run --rm -it --entrypoint /bin/bash nanoclaw-agent:latest
 ```
 
 ## SDK Options Reference
@@ -228,30 +208,27 @@ query({
 ## Rebuilding After Changes
 
 ```bash
-# Rebuild main app
-npm run build
+# Full rebuild (host + UI + container) and restart
+./scripts/restart.sh --build
 
-# Rebuild container (use --no-cache for clean rebuild)
-./container/build.sh
-
-# Or force full rebuild
-container builder prune -af
-./container/build.sh
+# Or manually:
+npm run build                      # Host TypeScript
+cd ui && npm install && npm run build && cd ..  # WebUI frontend
+./container/build.sh               # Container image (auto-detects runtime)
 ```
 
 ## Checking Container Image
 
 ```bash
+RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
+
 # List images
-container images
+$RUNTIME images | grep nanoclaw
 
 # Check what's in the image
-container run --rm --entrypoint /bin/bash nanoclaw-agent:latest -c '
+$RUNTIME run --rm --entrypoint /bin/bash nanoclaw-agent:latest -c '
   echo "=== Node version ==="
   node --version
-
-  echo "=== Claude Code version ==="
-  claude --version
 
   echo "=== Installed packages ==="
   ls /app/node_modules/
@@ -320,23 +297,30 @@ Run this to check common issues:
 ```bash
 echo "=== Checking NanoClaw Container Setup ==="
 
+RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
+echo "Runtime: $RUNTIME"
+
 echo -e "\n1. Authentication configured?"
 [ -f .env ] && (grep -q "CLAUDE_CODE_OAUTH_TOKEN=sk-" .env || grep -q "ANTHROPIC_API_KEY=sk-" .env) && echo "OK" || echo "MISSING - add CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY to .env"
 
-echo -e "\n2. Env file copied for container?"
-[ -f data/env/env ] && echo "OK" || echo "MISSING - will be created on first run"
+echo -e "\n2. Container runtime running?"
+if [ "$RUNTIME" = "container" ]; then
+  container system status &>/dev/null && echo "OK" || echo "NOT RUNNING - run: container system start"
+else
+  docker info &>/dev/null && echo "OK" || echo "NOT RUNNING - start Docker Desktop or: sudo systemctl start docker"
+fi
 
-echo -e "\n3. Apple Container system running?"
-container system status &>/dev/null && echo "OK" || echo "NOT RUNNING - NanoClaw should auto-start it; check logs"
+echo -e "\n3. Container image exists?"
+$RUNTIME images nanoclaw-agent:latest --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -q nanoclaw && echo "OK" || echo "MISSING - run ./container/build.sh"
 
-echo -e "\n4. Container image exists?"
-echo '{}' | container run -i --entrypoint /bin/echo nanoclaw-agent:latest "OK" 2>/dev/null || echo "MISSING - run ./container/build.sh"
-
-echo -e "\n5. Session mount path correct?"
+echo -e "\n4. Session mount path correct?"
 grep -q "/home/node/.claude" src/container-runner.ts 2>/dev/null && echo "OK" || echo "WRONG - should mount to /home/node/.claude/, not /root/.claude/"
 
-echo -e "\n6. Groups directory?"
+echo -e "\n5. Groups directory?"
 ls -la groups/ 2>/dev/null || echo "MISSING - run setup"
+
+echo -e "\n6. WebUI built?"
+[ -f ui/dist/index.html ] && echo "OK" || echo "MISSING - run: cd ui && npm install && npm run build"
 
 echo -e "\n7. Recent container logs?"
 ls -t groups/*/logs/container-*.log 2>/dev/null | head -3 || echo "No container logs yet"

@@ -120,6 +120,9 @@ async function runTask(
           await deps.sendMessage(task.chat_jid, streamedOutput.result);
           // Only reset idle timer on actual results, not session-update markers
           resetIdleTimer();
+        } else if (streamedOutput.status !== 'error') {
+          // Null result = agent query/turn completed
+          logger.info({ group: group.name, taskId: task.id }, 'Agent query completed');
         }
         if (streamedOutput.status === 'error') {
           error = streamedOutput.error || 'Unknown error';
