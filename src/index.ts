@@ -460,8 +460,13 @@ function ensureContainerSystemRunning(): void {
         .map((c) => c.configuration.id);
       for (const name of orphans) {
         try {
-          execSync(`container stop ${name}`, { stdio: 'pipe' });
-        } catch { /* already stopped */ }
+          execSync(`container stop ${name}`, { stdio: 'pipe', timeout: 10000 });
+        } catch {
+          // If stop hangs, force kill via the runtime process
+          try {
+            execSync(`kill -9 $(launchctl list | grep ${name} | awk '{print $1}')`, { stdio: 'pipe', timeout: 5000 });
+          } catch { /* best effort */ }
+        }
       }
       if (orphans.length > 0) {
         logger.info({ count: orphans.length, names: orphans }, 'Stopped orphaned containers');
@@ -474,8 +479,8 @@ function ensureContainerSystemRunning(): void {
       const orphans = output.trim().split('\n').filter(Boolean);
       for (const name of orphans) {
         try {
-          execSync(`docker stop ${name}`, { stdio: 'pipe' });
-          execSync(`docker rm ${name}`, { stdio: 'pipe' });
+          execSync(`docker stop -t 5 ${name}`, { stdio: 'pipe', timeout: 10000 });
+          execSync(`docker rm -f ${name}`, { stdio: 'pipe', timeout: 5000 });
         } catch { /* already stopped */ }
       }
       if (orphans.length > 0) {
