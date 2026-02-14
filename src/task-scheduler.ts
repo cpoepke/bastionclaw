@@ -150,6 +150,15 @@ async function runTask(
     logger.error({ taskId: task.id, error }, 'Task failed');
   }
 
+  // Notify the user if the task failed (e.g. OOM, crash)
+  if (error && !result) {
+    try {
+      await deps.sendMessage(task.chat_jid, `⚠️ Task failed: ${error.slice(0, 200)}`);
+    } catch (notifyErr) {
+      logger.warn({ taskId: task.id, err: notifyErr }, 'Failed to send task error notification');
+    }
+  }
+
   const durationMs = Date.now() - startTime;
 
   logTaskRun({

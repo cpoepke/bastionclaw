@@ -519,6 +519,13 @@ export async function runContainerAgent(
       logger.debug({ logFile, verbose: isVerbose }, 'Container log written');
 
       if (code !== 0) {
+        // code === null means the process was killed by a signal (SIGKILL).
+        // Most common cause: OOM killer when container exceeds memory limit.
+        const isOomLikely = code === null;
+        const errorDetail = isOomLikely
+          ? 'Container was killed (likely out of memory)'
+          : `Container exited with code ${code}`;
+
         logger.error(
           {
             group: group.name,
@@ -527,14 +534,15 @@ export async function runContainerAgent(
             stderr,
             stdout,
             logFile,
+            isOomLikely,
           },
-          'Container exited with error',
+          isOomLikely ? 'Container OOM killed' : 'Container exited with error',
         );
 
         resolve({
           status: 'error',
           result: null,
-          error: `Container exited with code ${code}: ${stderr.slice(-200)}`,
+          error: `${errorDetail}: ${stderr.slice(-200)}`,
         });
         return;
       }

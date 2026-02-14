@@ -58,6 +58,7 @@ interface SDKUserMessage {
 const IPC_INPUT_DIR = '/workspace/ipc/input';
 const IPC_INPUT_CLOSE_SENTINEL = path.join(IPC_INPUT_DIR, '_close');
 const IPC_POLL_MS = 500;
+const QUERY_INACTIVITY_TIMEOUT_MS = 120_000; // 2 minutes with no SDK messages → abort
 
 /**
  * Push-based async iterable for streaming user messages to the SDK.
@@ -338,7 +339,7 @@ async function runQuery(
   containerInput: ContainerInput,
   sdkEnv: Record<string, string | undefined>,
   resumeAt?: string,
-): Promise<{ newSessionId?: string; lastAssistantUuid?: string; closedDuringQuery: boolean }> {
+): Promise<{ newSessionId?: string; lastAssistantUuid?: string; closedDuringQuery: boolean; timedOut: boolean }> {
   const stream = new MessageStream();
   stream.push(prompt);
 
@@ -374,6 +375,20 @@ async function runQuery(
   if (!containerInput.isMain && fs.existsSync(globalClaudeMdPath)) {
     globalClaudeMd = fs.readFileSync(globalClaudeMdPath, 'utf-8');
   }
+
+  // Inactivity timer: if the SDK produces no messages for 2 minutes, abort.
+  // This prevents the container from hanging indefinitely on a stuck API call.
+  let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+  let timedOut = false;
+  const resetInactivityTimer = () => {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(() => {
+      log(`Query inactivity timeout (${QUERY_INACTIVITY_TIMEOUT_MS / 1000}s with no SDK messages), aborting`);
+      timedOut = true;
+      stream.end();
+    }, QUERY_INACTIVITY_TIMEOUT_MS);
+  };
+  resetInactivityTimer();
 
   for await (const message of query({
     prompt: stream,
@@ -418,6 +433,7 @@ async function runQuery(
       },
     }
   })) {
+    resetInactivityTimer();
     messageCount++;
     const msgType = message.type === 'system' ? `system/${(message as { subtype?: string }).subtype}` : message.type;
     log(`[msg #${messageCount}] type=${msgType}`);
@@ -445,12 +461,20 @@ async function runQuery(
         result: textResult || null,
         newSessionId
       });
+      // Signal no more user messages so query() iterator terminates.
+      // The outer loop in main() will pick up subsequent IPC messages.
+      stream.end();
     }
+  }
+
+  if (inactivityTimer) clearTimeout(inactivityTimer);
+  if (timedOut) {
+    writeOutput({ status: 'error', result: null, newSessionId, error: 'Query timed out (no SDK activity)' });
   }
 
   ipcPolling = false;
   log(`Query done. Messages: ${messageCount}, results: ${resultCount}, lastAssistantUuid: ${lastAssistantUuid || 'none'}, closedDuringQuery: ${closedDuringQuery}`);
-  return { newSessionId, lastAssistantUuid, closedDuringQuery };
+  return { newSessionId, lastAssistantUuid, closedDuringQuery, timedOut };
 }
 
 async function main(): Promise<void> {
@@ -517,6 +541,13 @@ async function main(): Promise<void> {
       // idle timer and cause a 30-min delay before the next _close).
       if (queryResult.closedDuringQuery) {
         log('Close sentinel consumed during query, exiting');
+        break;
+      }
+
+      // If the query timed out due to inactivity, exit the container
+      // so the group queue is released and other messages can be processed.
+      if (queryResult.timedOut) {
+        log('Query timed out, exiting container');
         break;
       }
 

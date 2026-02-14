@@ -216,6 +216,16 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       logger.warn({ group: group.name }, 'Agent error after output was sent, skipping cursor rollback to prevent duplicates');
       return true;
     }
+
+    // Notify the user that something went wrong so they don't wait in silence.
+    if (channel) {
+      try {
+        await channel.sendMessage(chatJid, '⚠️ Something went wrong processing that request. The agent will retry automatically.');
+      } catch (notifyErr) {
+        logger.warn({ group: group.name, err: notifyErr }, 'Failed to send error notification to channel');
+      }
+    }
+
     // Roll back cursor so retries can re-process these messages
     lastAgentTimestamp[chatJid] = previousCursor;
     saveState();
