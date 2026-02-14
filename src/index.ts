@@ -385,8 +385,8 @@ async function startMessageLoop(): Promise<void> {
           const formatted = formatMessages(messagesToSend);
 
           if (queue.sendMessage(chatJid, formatted)) {
-            logger.debug(
-              { chatJid, count: messagesToSend.length },
+            logger.info(
+              { chatJid, count: messagesToSend.length, prompt: messagesToSend[0]?.content },
               'Piped messages to active container',
             );
             lastAgentTimestamp[chatJid] =
