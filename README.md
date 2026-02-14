@@ -34,6 +34,8 @@ The upstream project's philosophy of "skills over features" means these customiz
 
 ## Quick Start
 
+### macOS / Linux
+
 ```bash
 git clone https://github.com/harperaa/nanoclaw-hard-shell.git
 cd nanoclaw-hard-shell
@@ -42,6 +44,61 @@ claude
 
 Then run `/setup`. Claude Code handles everything: dependencies, Telegram bot creation, container setup, service configuration.
 
+### Windows
+
+Windows requires WSL2 (Windows Subsystem for Linux), which provides a real Linux environment. Everything runs inside WSL2.
+
+#### Step 1: Install WSL2
+
+Open **PowerShell as Administrator** (right-click Start > "Terminal (Admin)" or search "PowerShell" > Run as Administrator) and run:
+
+```powershell
+wsl --install
+```
+
+This installs WSL2 with Ubuntu. **Restart your computer** when prompted.
+
+After restarting, Ubuntu will open automatically. Create a Linux username and password when asked (these are separate from your Windows login).
+
+#### Step 2: Install Docker
+
+Download and install [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/). During installation, make sure **"Use WSL 2 instead of Hyper-V"** is checked.
+
+After installing, open Docker Desktop, go to **Settings > Resources > WSL Integration**, enable your Ubuntu distribution, and click **Apply & Restart**.
+
+#### Step 3: Install Node.js and Claude Code
+
+Open your Ubuntu terminal (search "Ubuntu" in Start menu) and run:
+
+```bash
+# Install Node.js 22
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# Install Claude Code
+npm install -g @anthropic-ai/claude-code
+```
+
+#### Step 4: Clone and Set Up
+
+**Important:** Clone inside your Ubuntu home directory, not on the Windows filesystem (`/mnt/c/`). The Windows filesystem is much slower through WSL2.
+
+```bash
+cd ~
+git clone https://github.com/harperaa/nanoclaw-hard-shell.git
+cd nanoclaw-hard-shell
+claude
+```
+
+Then run `/setup-windows`. Claude Code validates your WSL2 environment, installs dependencies, configures Docker or Podman, and runs 5 validation batteries. After that, run `/setup` to configure Telegram and your assistant.
+
+#### Keeping It Running
+
+WSL2 shuts down when you close all terminal windows. To keep NanoClaw running:
+
+- **Option A:** Keep a terminal window open
+- **Option B:** After setup completes, the systemd service keeps it running as long as WSL2 is active. To prevent WSL2 from shutting down, create a Windows scheduled task that runs `wsl -d Ubuntu -e sleep infinity` at login
+
 ## What It Supports
 
 - **Telegram I/O** — Message your agent from your phone (WhatsApp also supported via `/add-whatsapp` skill)
@@ -49,7 +106,7 @@ Then run `/setup`. Claude Code handles everything: dependencies, Telegram bot cr
 - **Main channel** — Your private channel (DM with bot) for admin control; every other group is completely isolated
 - **Scheduled tasks** — Recurring jobs that run the agent and can message you back
 - **Web access** — Search and fetch content
-- **Container isolation** — Agents sandboxed in Apple Container (macOS) or Docker (macOS/Linux)
+- **Container isolation** — Agents sandboxed in Apple Container (macOS) or Docker (macOS/Linux/Windows WSL2)
 - **Agent Swarms** — Spin up teams of specialized agents that collaborate on complex tasks
 - **Optional integrations** — Add Gmail (`/add-gmail`) and more via skills
 - **Web control panel** — Browser-based UI for monitoring, chat, and management
@@ -121,10 +178,10 @@ Issues and PRs are welcome. If your change would also benefit the upstream proje
 
 ## Requirements
 
-- macOS or Linux
+- macOS, Linux, or Windows 10/11 (via WSL2)
 - Node.js 20+
 - [Claude Code](https://claude.ai/download)
-- [Apple Container](https://github.com/apple/container) (macOS) or [Docker](https://docker.com/products/docker-desktop) (macOS/Linux)
+- [Apple Container](https://github.com/apple/container) (macOS) or [Docker](https://docker.com/products/docker-desktop) (macOS/Linux/Windows WSL2)
 - A Telegram account (for creating a bot via [@BotFather](https://t.me/BotFather))
 
 ## Architecture
@@ -157,11 +214,15 @@ Telegram has an official bot API, making it the most reliable and easiest to set
 
 **Why Apple Container instead of Docker?**
 
-On macOS, Apple Container is lightweight, fast, and optimized for Apple silicon. But Docker is also fully supported — during `/setup`, you can choose which runtime to use. On Linux, Docker is used automatically.
+On macOS, Apple Container is lightweight, fast, and optimized for Apple silicon. But Docker is also fully supported — during `/setup`, you can choose which runtime to use. On Linux and Windows (WSL2), Docker is used automatically. Podman is also supported on WSL2.
 
 **Can I run this on Linux?**
 
 Yes. Run `/setup` and it will automatically configure Docker as the container runtime.
+
+**Can I run this on Windows?**
+
+Yes, via WSL2. See the [Windows quick start](#windows) above. Run `/setup-windows` inside WSL2 for guided setup — it validates your environment, installs Docker or Podman, and runs 5 validation batteries. Requires Windows 10 version 2004+ or Windows 11.
 
 **Is this secure?**
 
