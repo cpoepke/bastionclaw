@@ -172,7 +172,12 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   };
 
   const channel = findChannel(channels, chatJid);
-  if (channel?.setTyping) await channel.setTyping(chatJid, true);
+  // Telegram typing indicators expire after ~5s, so re-send periodically
+  let typingInterval: ReturnType<typeof setInterval> | null = null;
+  if (channel?.setTyping) {
+    await channel.setTyping(chatJid, true);
+    typingInterval = setInterval(() => channel.setTyping!(chatJid, true), 4000);
+  }
   let hadError = false;
   let outputSentToUser = false;
 
@@ -200,6 +205,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     }
   });
 
+  if (typingInterval) clearInterval(typingInterval);
   if (channel?.setTyping) await channel.setTyping(chatJid, false);
   if (idleTimer) clearTimeout(idleTimer);
 
@@ -371,6 +377,10 @@ async function startMessageLoop(): Promise<void> {
             lastAgentTimestamp[chatJid] =
               messagesToSend[messagesToSend.length - 1].timestamp;
             saveState();
+            // Show typing indicator while the container processes the piped message
+            // (Telegram indicators expire after ~5s, so this is best-effort)
+            const ch = findChannel(channels, chatJid);
+            if (ch?.setTyping) await ch.setTyping(chatJid, true);
           } else {
             // No active container — enqueue for a new one
             queue.enqueueMessageCheck(chatJid);

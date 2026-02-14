@@ -92,7 +92,9 @@ export class GroupQueue {
 
     if (state.active) {
       state.pendingTasks.push({ id: taskId, groupJid, fn });
-      logger.debug({ groupJid, taskId }, 'Container active, task queued');
+      // Signal the idle container to exit so drainGroup picks up this work
+      this.closeStdin(groupJid);
+      logger.debug({ groupJid, taskId }, 'Container active, task queued (signalled idle container to close)');
       return;
     }
 

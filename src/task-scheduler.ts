@@ -16,6 +16,7 @@ import {
   getDueTasks,
   getTaskById,
   logTaskRun,
+  updateTask,
   updateTaskAfterRun,
 } from './db.js';
 import { GroupQueue } from './group-queue.js';
@@ -203,6 +204,11 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
         if (!currentTask || currentTask.status !== 'active') {
           continue;
         }
+
+        // Clear next_run immediately to prevent the scheduler from
+        // re-enqueuing the same task on the next poll (60s later).
+        // For recurring tasks, next_run is recalculated after completion.
+        updateTask(currentTask.id, { next_run: null });
 
         deps.queue.enqueueTask(
           currentTask.chat_jid,

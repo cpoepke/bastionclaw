@@ -57,20 +57,28 @@ pkill -f "node.*nanoclaw" 2>/dev/null || true
 echo "[3/6] Freeing port 3100..."
 lsof -ti :3100 2>/dev/null | xargs kill -9 2>/dev/null || true
 
-# 4. Stop all nanoclaw containers
+# 4. Stop all nanoclaw containers (with timeout to avoid hangs)
 echo "[4/6] Stopping orphaned containers..."
 if [ -n "$RUNTIME" ]; then
   if [ "$RUNTIME" = "container" ]; then
-    for c in $(container ls -a --format '{{.Names}}' 2>/dev/null | grep nanoclaw || true); do
-      echo "  Stopping: $c"
-      container stop "$c" 2>/dev/null || true
-      container rm "$c" 2>/dev/null || true
+    NANOCLAW_CONTAINERS=$(container ls --format json 2>/dev/null \
+      | python3 -c "import sys,json; cs=json.load(sys.stdin); print('\n'.join(c['configuration']['id'] for c in cs if c['configuration']['id'].startswith('nanoclaw-')))" 2>/dev/null || true)
+    for c in $NANOCLAW_CONTAINERS; do
+      echo "  Stopping: $c (timeout 10s)..."
+      # `container stop` hangs on stuck containers — use timeout + force kill
+      timeout 10 container stop "$c" 2>/dev/null || {
+        echo "  Stop hung, force killing via launchctl..."
+        LPID=$(launchctl list 2>/dev/null | grep "$c" | awk '{print $1}')
+        if [ -n "$LPID" ] && [ "$LPID" != "-" ]; then
+          kill -9 "$LPID" 2>/dev/null || true
+        fi
+      }
     done
   else
     for c in $(docker ps -a --format '{{.Names}}' --filter "name=nanoclaw-" 2>/dev/null || true); do
       echo "  Stopping: $c"
-      docker stop "$c" 2>/dev/null || true
-      docker rm "$c" 2>/dev/null || true
+      docker stop -t 5 "$c" 2>/dev/null || true
+      docker rm -f "$c" 2>/dev/null || true
     done
   fi
 fi
