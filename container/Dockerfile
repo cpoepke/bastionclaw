@@ -44,6 +44,9 @@ RUN npm install
 # Copy source code
 COPY agent-runner/ ./
 
+# Remove test files (not needed in container, vitest types unavailable at runtime)
+RUN rm -f src/*.test.ts vitest.config.ts
+
 # Build TypeScript
 RUN npm run build
 

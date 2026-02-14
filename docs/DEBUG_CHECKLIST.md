@@ -130,18 +130,14 @@ diff .env data/env/env
 ## Service Management
 
 ```bash
-# Restart the service
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+# Clean restart (recommended — stops orphaned containers, frees ports, restarts service)
+./scripts/restart.sh
+
+# Rebuild host + container image, then clean restart
+./scripts/restart.sh --build
 
 # View live logs
 tail -f logs/nanoclaw.log
-
-# Stop the service (careful — running containers are detached, not killed)
-launchctl bootout gui/$(id -u)/com.nanoclaw
-
-# Start the service
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.nanoclaw.plist
-
-# Rebuild after code changes
-npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
 ```
+
+**Note:** Always prefer `scripts/restart.sh` over raw launchctl commands. Raw `launchctl kickstart -k` leaves orphaned containers running and can cause port conflicts (EADDRINUSE on 3100).

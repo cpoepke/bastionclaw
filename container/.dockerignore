@@ -1,0 +1,3 @@
+agent-runner/src/**/*.test.ts
+agent-runner/vitest.config.ts
+agent-runner/dist/

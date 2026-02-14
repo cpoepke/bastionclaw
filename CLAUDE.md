@@ -41,9 +41,11 @@ npm run build        # Compile TypeScript
 
 Service management:
 ```bash
-launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist
-launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist
+./scripts/restart.sh          # Clean restart (stops orphaned containers + processes)
+./scripts/restart.sh --build  # Rebuild host + container image, then restart
 ```
+
+**Always use `scripts/restart.sh`** instead of raw launchctl commands. It cleans up orphaned containers, stale processes, and port conflicts before restarting.
 
 ## Container Build Cache
 
