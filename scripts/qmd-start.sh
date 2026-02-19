@@ -22,7 +22,8 @@ for dir in "$GROUPS_DIR"/*/; do
   "$QMD" collection add "$dir" --name "$name" 2>/dev/null || true
 done
 
-# Embed new/changed files (downloads embedding model on first run)
+# Discover new/changed files, then create vector embeddings
+"$QMD" update
 "$QMD" embed
 
 # Warm up search models by running a test query

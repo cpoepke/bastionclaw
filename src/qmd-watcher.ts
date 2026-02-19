@@ -18,11 +18,15 @@ function runEmbed(qmd: string): void {
   if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
   if (maxDelayTimer) { clearTimeout(maxDelayTimer); maxDelayTimer = null; }
 
-  logger.info('qmd auto-embed starting');
-  execFile(qmd, ['embed'], { timeout: 60000 }, (err) => {
-    embedRunning = false;
-    if (err) logger.warn({ err }, 'qmd auto-embed failed (non-fatal)');
-    else logger.debug('qmd auto-embed complete');
+  logger.info('qmd auto-update starting');
+  // update discovers new/changed files, embed creates vectors
+  execFile(qmd, ['update'], { timeout: 60000 }, (updateErr) => {
+    if (updateErr) logger.warn({ err: updateErr }, 'qmd update failed (non-fatal)');
+    execFile(qmd, ['embed'], { timeout: 60000 }, (embedErr) => {
+      embedRunning = false;
+      if (embedErr) logger.warn({ err: embedErr }, 'qmd auto-embed failed (non-fatal)');
+      else logger.debug('qmd auto-update+embed complete');
+    });
   });
 }
 
@@ -50,10 +54,13 @@ function ensureQmdCollections(qmd: string): void {
       }
     }
 
-    // Run initial embed (non-blocking)
-    execFile(qmd, ['embed'], { timeout: 60000 }, (err) => {
-      if (err) logger.warn({ err }, 'qmd initial embed failed (non-fatal)');
-      else logger.info('qmd initial embed complete');
+    // Run initial update + embed (non-blocking)
+    execFile(qmd, ['update'], { timeout: 60000 }, (updateErr) => {
+      if (updateErr) logger.warn({ err: updateErr }, 'qmd initial update failed (non-fatal)');
+      execFile(qmd, ['embed'], { timeout: 60000 }, (embedErr) => {
+        if (embedErr) logger.warn({ err: embedErr }, 'qmd initial embed failed (non-fatal)');
+        else logger.info('qmd initial update+embed complete');
+      });
     });
   } catch (err) {
     logger.warn({ err }, 'qmd collection registration failed (non-fatal)');

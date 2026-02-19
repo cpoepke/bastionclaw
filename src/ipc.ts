@@ -387,6 +387,8 @@ export async function processTaskIpc(
       // Always use directory-derived sourceGroup (trusted), never the payload's groupFolder
       const folder = sourceGroup;
       try {
+        // update discovers new/changed files, embed creates vectors
+        execFileSync(getQmdBin(), ['update'], { timeout: 30000, stdio: 'pipe' });
         execFileSync(getQmdBin(), ['embed', '-c', folder], { timeout: 30000, stdio: 'pipe' });
         logger.info({ folder }, 'qmd index refreshed');
       } catch (err) {
