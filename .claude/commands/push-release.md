@@ -331,6 +331,7 @@ Create the GitHub release with the generated changelog:
 
 ```bash
 gh release create 2026.02.18 \
+  --repo harperaa/nanoclaw-hard-shell \
   --title "2026.02.18: [Release Title]" \
   --notes "[Full changelog in proper markdown format]"
 ```
@@ -397,7 +398,7 @@ You can create it manually:
 4. Publish the release
 
 Or try again:
-gh release create 2026.02.18 --title "2026.02.18: [Title]" --notes "[Changelog]"
+gh release create 2026.02.18 --repo harperaa/nanoclaw-hard-shell --title "2026.02.18: [Title]" --notes "[Changelog]"
 ```
 
 ### If No GitHub CLI Installed
@@ -414,7 +415,7 @@ Option 1: Install GitHub CLI
   # or visit: https://cli.github.com
 
 Then run:
-  gh release create 2026.02.18 --title "2026.02.18: [Title]" --notes "[Changelog]"
+  gh release create 2026.02.18 --repo harperaa/nanoclaw-hard-shell --title "2026.02.18: [Title]" --notes "[Changelog]"
 
 Option 2: Create release manually
   Visit: https://github.com/harperaa/nanoclaw-hard-shell/releases/new
