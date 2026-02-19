@@ -27,6 +27,7 @@ interface ContainerInput {
   chatJid: string;
   isMain: boolean;
   isScheduledTask?: boolean;
+  assistantName?: string;
   secrets?: Record<string, string>;
 }
 
@@ -144,7 +145,7 @@ function getSessionSummary(sessionId: string, transcriptPath: string): string | 
 /**
  * Archive the full transcript to conversations/ before compaction.
  */
-function createPreCompactHook(): HookCallback {
+function createPreCompactHook(assistantName = 'Kia'): HookCallback {
   return async (input, _toolUseId, _context) => {
     const preCompact = input as PreCompactHookInput;
     const transcriptPath = preCompact.transcript_path;
@@ -174,7 +175,7 @@ function createPreCompactHook(): HookCallback {
       const filename = `${date}-${name}.md`;
       const filePath = path.join(conversationsDir, filename);
 
-      const markdown = formatTranscriptMarkdown(messages, summary);
+      const markdown = formatTranscriptMarkdown(messages, summary, assistantName);
       fs.writeFileSync(filePath, markdown);
 
       log(`Archived conversation to ${filePath}`);
@@ -231,7 +232,7 @@ function parseTranscript(content: string): ParsedMessage[] {
   return messages;
 }
 
-function formatTranscriptMarkdown(messages: ParsedMessage[], title?: string | null): string {
+function formatTranscriptMarkdown(messages: ParsedMessage[], title?: string | null, assistantName = 'Kia'): string {
   const now = new Date();
   const formatDateTime = (d: Date) => d.toLocaleString('en-US', {
     month: 'short',
@@ -250,7 +251,7 @@ function formatTranscriptMarkdown(messages: ParsedMessage[], title?: string | nu
   lines.push('');
 
   for (const msg of messages) {
-    const sender = msg.role === 'user' ? 'User' : 'Andy';
+    const sender = msg.role === 'user' ? 'User' : assistantName;
     const content = msg.content.length > 2000
       ? msg.content.slice(0, 2000) + '...'
       : msg.content;
@@ -259,6 +260,31 @@ function formatTranscriptMarkdown(messages: ParsedMessage[], title?: string | nu
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Export a live conversation snapshot to conversations/ for progressive qmd indexing.
+ * Called after each query turn so the conversation becomes searchable mid-session.
+ * Uses a stable filename so updates overwrite rather than creating duplicates.
+ */
+function exportConversationSnapshot(messages: ParsedMessage[], sessionId: string, assistantName = 'Kia'): void {
+  if (messages.length === 0) return;
+
+  try {
+    const conversationsDir = '/workspace/group/conversations';
+    fs.mkdirSync(conversationsDir, { recursive: true });
+
+    const date = new Date().toISOString().split('T')[0];
+    const shortId = sessionId.slice(0, 8);
+    const filename = `${date}-session-${shortId}.md`;
+    const filePath = path.join(conversationsDir, filename);
+
+    const markdown = formatTranscriptMarkdown(messages, 'Active Session', assistantName);
+    fs.writeFileSync(filePath, markdown);
+    log(`Exported conversation snapshot (${messages.length} messages) to ${filename}`);
+  } catch (err) {
+    log(`Failed to export conversation snapshot: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 /**
@@ -339,7 +365,7 @@ async function runQuery(
   containerInput: ContainerInput,
   sdkEnv: Record<string, string | undefined>,
   resumeAt?: string,
-): Promise<{ newSessionId?: string; lastAssistantUuid?: string; closedDuringQuery: boolean; timedOut: boolean }> {
+): Promise<{ newSessionId?: string; lastAssistantUuid?: string; closedDuringQuery: boolean; timedOut: boolean; messages: ParsedMessage[] }> {
   const stream = new MessageStream();
   stream.push(prompt);
 
@@ -358,6 +384,7 @@ async function runQuery(
     const messages = drainIpcInput();
     for (const text of messages) {
       log(`Piping IPC message into active query (${text.length} chars)`);
+      capturedMessages.push({ role: 'user', content: text });
       stream.push(text);
     }
     setTimeout(pollIpcDuringQuery, IPC_POLL_MS);
@@ -368,6 +395,10 @@ async function runQuery(
   let lastAssistantUuid: string | undefined;
   let messageCount = 0;
   let resultCount = 0;
+  const capturedMessages: ParsedMessage[] = [];
+
+  // Capture the initial user prompt
+  capturedMessages.push({ role: 'user', content: prompt });
 
   // Load global CLAUDE.md as additional system context (shared across all groups)
   const globalClaudeMdPath = '/workspace/global/CLAUDE.md';
@@ -407,7 +438,7 @@ async function runQuery(
         'TeamCreate', 'TeamDelete', 'SendMessage',
         'TodoWrite', 'ToolSearch', 'Skill',
         'NotebookEdit',
-        'mcp__nanoclaw__*'
+        'mcp__nanoclaw__*',
       ],
       env: sdkEnv,
       permissionMode: 'bypassPermissions',
@@ -425,7 +456,7 @@ async function runQuery(
         },
       },
       hooks: {
-        PreCompact: [{ hooks: [createPreCompactHook()] }],
+        PreCompact: [{ hooks: [createPreCompactHook(containerInput.assistantName)] }],
         PreToolUse: [
           { matcher: 'Bash', hooks: [createSanitizeBashHook()] },
           { matcher: 'Read', hooks: [createSecretPathBlockHook()] },
@@ -440,6 +471,12 @@ async function runQuery(
 
     if (message.type === 'assistant' && 'uuid' in message) {
       lastAssistantUuid = (message as { uuid: string }).uuid;
+      // Capture assistant text for progressive indexing
+      const content = (message as { message?: { content?: Array<{ type: string; text?: string }> } }).message?.content;
+      if (Array.isArray(content)) {
+        const text = content.filter(c => c.type === 'text').map(c => c.text || '').join('');
+        if (text) capturedMessages.push({ role: 'assistant', content: text });
+      }
     }
 
     if (message.type === 'system' && message.subtype === 'init') {
@@ -474,7 +511,7 @@ async function runQuery(
 
   ipcPolling = false;
   log(`Query done. Messages: ${messageCount}, results: ${resultCount}, lastAssistantUuid: ${lastAssistantUuid || 'none'}, closedDuringQuery: ${closedDuringQuery}`);
-  return { newSessionId, lastAssistantUuid, closedDuringQuery, timedOut };
+  return { newSessionId, lastAssistantUuid, closedDuringQuery, timedOut, messages: capturedMessages };
 }
 
 async function main(): Promise<void> {
@@ -524,6 +561,7 @@ async function main(): Promise<void> {
 
   // Query loop: run query → wait for IPC message → run new query → repeat
   let resumeAt: string | undefined;
+  const allMessages: ParsedMessage[] = []; // Accumulate across query rounds for progressive indexing
   try {
     while (true) {
       log(`Starting query (session: ${sessionId || 'new'}, resumeAt: ${resumeAt || 'latest'})...`);
@@ -534,6 +572,12 @@ async function main(): Promise<void> {
       }
       if (queryResult.lastAssistantUuid) {
         resumeAt = queryResult.lastAssistantUuid;
+      }
+
+      // Progressive indexing: accumulate messages and export snapshot after each turn
+      allMessages.push(...queryResult.messages);
+      if (sessionId) {
+        exportConversationSnapshot(allMessages, sessionId, containerInput.assistantName);
       }
 
       // If _close was consumed during the query, exit immediately.

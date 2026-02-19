@@ -1,7 +1,10 @@
+import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
 import { CronExpressionParser } from 'cron-parser';
+
+import { getQmdBin } from './qmd.js';
 
 import {
   ASSISTANT_NAME,
@@ -172,6 +175,11 @@ export async function processTaskIpc(
     folder?: string;
     trigger?: string;
     containerConfig?: RegisteredGroup['containerConfig'];
+    // For qmd request-response IPC
+    requestId?: string;
+    query?: string;
+    mode?: string;
+    docid?: string;
   },
   sourceGroup: string, // Verified identity from IPC directory
   isMain: boolean, // Verified from directory path
@@ -375,7 +383,82 @@ export async function processTaskIpc(
       }
       break;
 
+    case 'refresh_index': {
+      // Always use directory-derived sourceGroup (trusted), never the payload's groupFolder
+      const folder = sourceGroup;
+      try {
+        execFileSync(getQmdBin(), ['embed', '-c', folder], { timeout: 30000, stdio: 'pipe' });
+        logger.info({ folder }, 'qmd index refreshed');
+      } catch (err) {
+        logger.warn({ folder, err }, 'qmd embed failed (non-fatal)');
+      }
+      break;
+    }
+
+    case 'qmd_search': {
+      const requestId = data.requestId as string | undefined;
+      if (!requestId) break;
+
+      const query = (data.query as string || '').slice(0, 500);
+      const mode = data.mode as string || 'keyword';
+      if (!query) {
+        writeIpcResponse(sourceGroup, requestId, { results: [], error: 'Missing query' });
+        break;
+      }
+
+      const cmd = mode === 'semantic' ? 'vsearch' : mode === 'hybrid' ? 'query' : 'search';
+      try {
+        const result = execFileSync(getQmdBin(), [cmd, '--json', query], {
+          timeout: 30000,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          encoding: 'utf-8',
+        });
+        writeIpcResponse(sourceGroup, requestId, { results: JSON.parse(result) });
+      } catch (err) {
+        writeIpcResponse(sourceGroup, requestId, {
+          results: [],
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      break;
+    }
+
+    case 'qmd_get': {
+      const requestId = data.requestId as string | undefined;
+      if (!requestId) break;
+
+      const docid = data.docid as string;
+      if (!docid) {
+        writeIpcResponse(sourceGroup, requestId, { error: 'Missing docid' });
+        break;
+      }
+
+      try {
+        const content = execFileSync(getQmdBin(), ['get', docid], {
+          timeout: 10000,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          encoding: 'utf-8',
+        });
+        writeIpcResponse(sourceGroup, requestId, { docid, content });
+      } catch (err) {
+        writeIpcResponse(sourceGroup, requestId, {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      break;
+    }
+
     default:
       logger.warn({ type: data.type }, 'Unknown IPC task type');
   }
+}
+
+/** Write a response file for a request-response IPC call */
+function writeIpcResponse(sourceGroup: string, requestId: string, data: unknown): void {
+  const responsesDir = path.join(DATA_DIR, 'ipc', sourceGroup, 'responses');
+  fs.mkdirSync(responsesDir, { recursive: true });
+  const responsePath = path.join(responsesDir, `${requestId}.json`);
+  const tempPath = `${responsePath}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(data));
+  fs.renameSync(tempPath, responsePath);
 }

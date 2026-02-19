@@ -14,6 +14,7 @@ import { CronExpressionParser } from 'cron-parser';
 const IPC_DIR = '/workspace/ipc';
 const MESSAGES_DIR = path.join(IPC_DIR, 'messages');
 const TASKS_DIR = path.join(IPC_DIR, 'tasks');
+const RESPONSES_DIR = path.join(IPC_DIR, 'responses');
 
 // Context from environment variables (set by the agent runner)
 const chatJid = process.env.NANOCLAW_CHAT_JID!;
@@ -271,6 +272,145 @@ Use available_groups.json to find the JID for a group. The folder name should be
     return {
       content: [{ type: 'text' as const, text: `Group "${args.name}" registered. It will start receiving messages immediately.` }],
     };
+  },
+);
+
+server.tool(
+  'refresh_memory_index',
+  'Re-index workspace files for semantic search. Run after creating or updating important documents.',
+  {},
+  async () => {
+    writeIpcFile(TASKS_DIR, {
+      type: 'refresh_index',
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    });
+    return { content: [{ type: 'text' as const, text: 'Memory index refresh requested.' }] };
+  },
+);
+
+// --- Request-response IPC for qmd memory search ---
+
+function sendIpcRequest(data: object, timeoutMs = 30000): Promise<unknown> {
+  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const responseFile = path.join(RESPONSES_DIR, `${requestId}.json`);
+
+  // Write the request with the requestId so the host knows where to write the response
+  writeIpcFile(TASKS_DIR, { ...data, requestId });
+
+  // Poll for response file
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const poll = () => {
+      try {
+        if (fs.existsSync(responseFile)) {
+          const content = fs.readFileSync(responseFile, 'utf-8');
+          fs.unlinkSync(responseFile); // Clean up
+          resolve(JSON.parse(content));
+          return;
+        }
+      } catch {
+        // File may be partially written, retry
+      }
+      if (Date.now() - start > timeoutMs) {
+        reject(new Error('Memory search timed out'));
+        return;
+      }
+      setTimeout(poll, 100);
+    };
+    poll();
+  });
+}
+
+server.tool(
+  'memory_search',
+  `Search long-term memory using keyword search (BM25). Fast and precise when you know exact terms.
+Returns ranked results with file paths, scores, and text snippets.`,
+  {
+    query: z.string().max(500).describe('The search query'),
+    limit: z.number().optional().default(10).describe('Max results (default 10)'),
+  },
+  async (args) => {
+    try {
+      const result = await sendIpcRequest({
+        type: 'qmd_search',
+        mode: 'keyword',
+        query: args.query,
+        limit: args.limit,
+        groupFolder,
+      });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `Search failed: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+    }
+  },
+);
+
+server.tool(
+  'memory_semantic_search',
+  `Search long-term memory using semantic/vector similarity. Best when keywords don't capture intent.
+Finds conceptually related content even with different wording.`,
+  {
+    query: z.string().max(500).describe('The search query'),
+    limit: z.number().optional().default(10).describe('Max results (default 10)'),
+  },
+  async (args) => {
+    try {
+      const result = await sendIpcRequest({
+        type: 'qmd_search',
+        mode: 'semantic',
+        query: args.query,
+        limit: args.limit,
+        groupFolder,
+      });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `Search failed: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+    }
+  },
+);
+
+server.tool(
+  'memory_hybrid_search',
+  `Search long-term memory using hybrid search (BM25 + semantic + LLM reranking). Best quality results.
+Combines keyword precision with semantic understanding. Use this as your default memory search.`,
+  {
+    query: z.string().max(500).describe('The search query'),
+    limit: z.number().optional().default(10).describe('Max results (default 10)'),
+  },
+  async (args) => {
+    try {
+      const result = await sendIpcRequest({
+        type: 'qmd_search',
+        mode: 'hybrid',
+        query: args.query,
+        limit: args.limit,
+        groupFolder,
+      });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `Search failed: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+    }
+  },
+);
+
+server.tool(
+  'memory_get',
+  'Retrieve a specific document from memory by its document ID or file path.',
+  {
+    docid: z.string().describe('The document ID or file path to retrieve'),
+  },
+  async (args) => {
+    try {
+      const result = await sendIpcRequest({
+        type: 'qmd_get',
+        docid: args.docid,
+        groupFolder,
+      });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `Get failed: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+    }
   },
 );
 

@@ -20,6 +20,7 @@ import { registerSkillRoutes } from './api/skills.js';
 import { registerConfigRoutes } from './api/config.js';
 import { registerLogRoutes } from './api/logs.js';
 import { registerDebugRoutes } from './api/debug.js';
+import { registerMemoryRoutes } from './api/memory.js';
 import { addClient } from './ws.js';
 
 export interface ServerDeps {
@@ -62,6 +63,7 @@ export async function startWebServer(deps: ServerDeps): Promise<void> {
   registerConfigRoutes(app);
   registerLogRoutes(app);
   registerDebugRoutes(app, deps);
+  registerMemoryRoutes(app);
 
   // WebSocket endpoint
   app.register(async (wsApp) => {

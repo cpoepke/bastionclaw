@@ -480,6 +480,10 @@ cd ui && npm install && npm run build && cd ..
 
 # Create logs directory
 mkdir -p logs
+
+# Initialize memory search (registers collections, embeds files, downloads models)
+# First run downloads ~2GB of search models — may take a few minutes
+./scripts/qmd-start.sh
 ```
 
 ### 8b. Configure background service

@@ -112,3 +112,20 @@ export interface LogEntry {
 }
 
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+
+export interface MemoryData {
+  collections?: { name: string; path: string; fileCount: number }[];
+  totalDocuments?: number;
+  totalVectors?: number;
+  indexSize?: string;
+  mcpStatus?: string;
+  mcpPid?: string | null;
+  lastUpdated?: string;
+  error?: string;
+  message?: string;
+}
+
+export interface MemorySearchResult {
+  results: { docid: string; file: string; title: string; score: number; snippet: string }[];
+  error?: string;
+}

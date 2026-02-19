@@ -22,6 +22,9 @@ groups/global/*
 *.keys.json
 .env
 
+# Workspace (youtube transcripts, skill output)
+workspace/
+
 # OS
 .DS_Store
 
@@ -30,6 +33,9 @@ groups/global/*
 .vscode/
 
 agents-sdk-docs
+
+# Firecrawl cache
+.firecrawl/
 
 # Local-only skills
 container/skills/oura/

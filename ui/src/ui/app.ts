@@ -6,7 +6,7 @@ import type { TabId } from './navigation.ts';
 import type {
   OverviewData, ChannelData, GroupData, TaskData,
   SessionData, SkillData, ConfigData, DebugData,
-  LogEntry, MessageData,
+  LogEntry, MessageData, MemoryData, MemorySearchResult,
 } from './types.ts';
 
 @customElement('nanoclaw-app')
@@ -57,6 +57,12 @@ export class NanoClawApp extends LitElement {
   @state() logsLevel = '';
   @state() logsAutoFollow = true;
 
+  // Memory
+  @state() memory: MemoryData | null = null;
+  @state() memorySearchQuery = '';
+  @state() memorySearchMode = 'keyword';
+  @state() memorySearchResults: MemorySearchResult | null = null;
+
   // Debug
   @state() debug: DebugData | null = null;
 
@@ -75,10 +81,13 @@ export class NanoClawApp extends LitElement {
     this.ws.connect();
     this.wsCleanup = this.ws.on((msg) => this.handleWsMessage(msg));
     this.loadTab();
-    // Refresh overview every 10s when on overview tab
+    // Refresh overview every 10s when on overview tab, memory every 30s
     this.pollTimer = setInterval(() => {
       if (this.tab === 'overview') this.loadOverview();
     }, 10000);
+    setInterval(() => {
+      if (this.tab === 'memory') this.loadMemory();
+    }, 30000);
   }
 
   disconnectedCallback() {
@@ -127,6 +136,7 @@ export class NanoClawApp extends LitElement {
       switch (this.tab) {
         case 'overview': await this.loadOverview(); break;
         case 'channels': await this.loadChannels(); break;
+        case 'memory': await this.loadMemory(); break;
         case 'groups': await this.loadGroups(); break;
         case 'messages': await this.loadMessages(); break;
         case 'tasks': await this.loadTasks(); break;
@@ -166,6 +176,13 @@ export class NanoClawApp extends LitElement {
     params.set('limit', '500');
     const data: { entries: LogEntry[] } = await this.fetchApi(`/api/logs?${params}`);
     this.logs = data.entries;
+  }
+  async loadMemory() { this.memory = await this.fetchApi('/api/memory'); }
+  async searchMemory() {
+    if (!this.memorySearchQuery.trim()) return;
+    this.memorySearchResults = await this.fetchApi(
+      `/api/memory/search?q=${encodeURIComponent(this.memorySearchQuery)}&mode=${this.memorySearchMode}`,
+    );
   }
   async loadDebug() { this.debug = await this.fetchApi('/api/debug'); }
   async loadChatHistory() {

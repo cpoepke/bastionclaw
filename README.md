@@ -109,6 +109,7 @@ WSL2 shuts down when you close all terminal windows. To keep NanoClaw running:
 - **Container isolation** — Agents sandboxed in Apple Container (macOS) or Docker (macOS/Linux/Windows WSL2)
 - **Agent Swarms** — Spin up teams of specialized agents that collaborate on complex tasks
 - **Optional integrations** — Add Gmail (`/add-gmail`) and more via skills
+- **Semantic memory** — Long-term memory powered by [qmd](https://github.com/tobi/qmd) with hybrid search (BM25 + vector + LLM reranking). Conversations are progressively indexed mid-session and archived at compaction. The agent naturally recalls past discussions without being asked. Runs fully local with GGUF models (~2GB) — no cloud APIs needed. See [docs/MEMORY.md](docs/MEMORY.md) for architecture details.
 - **Web control panel** — Browser-based UI for monitoring, chat, and management
 
 ## Web Interface
@@ -205,6 +206,7 @@ Key files:
 - `src/webui/server.ts` - Fastify server, API routes, WebSocket handler
 - `ui/` - Lit + Vite frontend (built to `ui/dist/`)
 - `groups/*/CLAUDE.md` - Per-group memory
+- `docs/MEMORY.md` - Memory system architecture and qmd integration
 
 ## FAQ
 

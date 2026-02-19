@@ -5,6 +5,7 @@ export type TabId =
   | 'chat'
   | 'overview'
   | 'channels'
+  | 'memory'
   | 'groups'
   | 'messages'
   | 'tasks'
@@ -37,6 +38,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'overview', label: 'Overview', icon: icons.barChart },
       { id: 'channels', label: 'Channels', icon: icons.radio },
+      { id: 'memory', label: 'Memory', icon: icons.memory },
     ],
   },
   {
@@ -64,6 +66,7 @@ export function tabDescription(tab: TabId): string {
     case 'chat': return 'Agent chat session.';
     case 'overview': return 'System status and health.';
     case 'channels': return 'WhatsApp and Telegram status.';
+    case 'memory': return 'Semantic memory index, collections, and search.';
     case 'groups': return 'Registered groups and their configuration.';
     case 'messages': return 'Message history by group.';
     case 'tasks': return 'Scheduled tasks and run logs.';

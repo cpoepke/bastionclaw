@@ -83,6 +83,15 @@ if [ -n "$RUNTIME" ]; then
   fi
 fi
 
+# 5a. Stop qmd memory server
+QMD="$PROJECT_DIR/node_modules/.bin/qmd"
+if [ -x "$QMD" ]; then
+  echo "[5a] Stopping qmd memory server..."
+  "$QMD" mcp stop 2>/dev/null || true
+else
+  echo "[5a] qmd not installed yet, skipping stop"
+fi
+
 # 5. Rebuild if requested
 if [ "$BUILD" = true ]; then
   echo "[5/6] Rebuilding..."
@@ -109,6 +118,14 @@ if [ "$BUILD" = true ]; then
   fi
 else
   echo "[5/6] Skipping build (use --build to rebuild)"
+fi
+
+# 5b. Start qmd memory server
+echo "[5b] Starting qmd memory server..."
+if [ -x "$QMD" ]; then
+  "$SCRIPT_DIR/qmd-start.sh" || echo "  WARNING: qmd failed to start (non-fatal)"
+else
+  echo "  qmd not found, skipping (run 'npm install' to install dependencies)"
 fi
 
 # 6. Start the service

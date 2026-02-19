@@ -43,6 +43,7 @@ import { findChannel, formatMessages, formatOutbound } from './router.js';
 import { startSchedulerLoop } from './task-scheduler.js';
 import { Channel, NewMessage, RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
+import { startQmdWatcher } from './qmd-watcher.js';
 import { startWebServer } from './webui/server.js';
 
 // Re-export for backwards compatibility during refactor
@@ -295,6 +296,7 @@ async function runAgent(
         groupFolder: group.folder,
         chatJid,
         isMain,
+        assistantName: ASSISTANT_NAME,
       },
       (proc, containerName) => queue.registerProcess(chatJid, proc, containerName, group.folder),
       wrappedOnOutput,
@@ -576,6 +578,9 @@ async function main(): Promise<void> {
       requiresTrigger: false,
     };
   }
+
+  // Start qmd file watcher for auto-indexing memory
+  startQmdWatcher();
 
   // Start subsystems (independently of connection handler)
   startSchedulerLoop({

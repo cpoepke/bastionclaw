@@ -36,12 +36,35 @@ When working as a sub-agent or teammate, only use `send_message` if instructed t
 
 ## Memory
 
-The `conversations/` folder contains searchable history of past conversations. Use this to recall context from previous sessions.
+You have a long-term semantic memory that indexes all your workspace files and past conversations.
 
-When you learn something important:
-- Create files for structured data (e.g., `customers.md`, `preferences.md`)
+### Automatic Recall
+
+ALWAYS search your memory before responding when:
+- The user asks about something you may have discussed before
+- The user references a person, project, topic, or event by name
+- The user says "remember", "we talked about", "last time", "before", or similar
+- You're about to say "I don't have context about that" — search first
+- The conversation topic relates to any notes, preferences, or documents you've saved
+- A scheduled task needs context about the user's preferences or past requests
+
+Use `mcp__nanoclaw__memory_hybrid_search` for best results (hybrid BM25 + semantic + reranking).
+Use `mcp__nanoclaw__memory_search` for fast keyword lookups when you know the exact term.
+
+### Saving Knowledge
+
+The `conversations/` folder automatically archives past conversations. When you learn something important:
+- Create files for structured data (e.g., `preferences.md`, `contacts.md`)
 - Split files larger than 500 lines into folders
 - Keep an index in your memory for the files you create
+
+### Memory Tools
+
+- `mcp__nanoclaw__memory_hybrid_search` — Best quality hybrid search (BM25 + semantic + LLM reranking)
+- `mcp__nanoclaw__memory_search` — Fast keyword search (BM25)
+- `mcp__nanoclaw__memory_semantic_search` — Semantic similarity search
+- `mcp__nanoclaw__memory_get` — Retrieve document by path or docid
+- `mcp__nanoclaw__refresh_memory_index` — Re-index after writing important files
 
 ## WhatsApp Formatting (and other messaging apps)
 
