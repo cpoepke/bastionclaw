@@ -7,6 +7,7 @@ import type {
   OverviewData, ChannelData, GroupData, TaskData,
   SessionData, SkillData, ConfigData, DebugData,
   LogEntry, MessageData, MemoryData, MemorySearchResult,
+  InsightData, InsightSourceData, InsightStatsData,
 } from './types.ts';
 
 @customElement('nanoclaw-app')
@@ -62,6 +63,20 @@ export class NanoClawApp extends LitElement {
   @state() memorySearchQuery = '';
   @state() memorySearchMode = 'keyword';
   @state() memorySearchResults: MemorySearchResult | null = null;
+
+  // Insights
+  @state() insights: InsightData[] = [];
+  @state() insightTotal = 0;
+  @state() insightSources: InsightSourceData[] = [];
+  @state() insightSourceTotal = 0;
+  @state() insightStats: InsightStatsData | null = null;
+  @state() insightSearchQuery = '';
+  @state() insightCategoryFilter = '';
+  @state() insightSortBy = 'source_count';
+  @state() insightDetails: Record<string, any> = {};
+  @state() insightPage = 0;
+  @state() insightSourcePage = 0;
+  insightPageSize = 20;
 
   // Debug
   @state() debug: DebugData | null = null;
@@ -137,6 +152,7 @@ export class NanoClawApp extends LitElement {
         case 'overview': await this.loadOverview(); break;
         case 'channels': await this.loadChannels(); break;
         case 'memory': await this.loadMemory(); break;
+        case 'insights': await this.loadInsights(); break;
         case 'groups': await this.loadGroups(); break;
         case 'messages': await this.loadMessages(); break;
         case 'tasks': await this.loadTasks(); break;
@@ -183,6 +199,45 @@ export class NanoClawApp extends LitElement {
     this.memorySearchResults = await this.fetchApi(
       `/api/memory/search?q=${encodeURIComponent(this.memorySearchQuery)}&mode=${this.memorySearchMode}`,
     );
+  }
+  async loadInsights() {
+    const params = new URLSearchParams();
+    if (this.insightCategoryFilter) params.set('category', this.insightCategoryFilter);
+    if (this.insightSortBy) params.set('sort', this.insightSortBy);
+    if (this.insightSearchQuery) params.set('search', this.insightSearchQuery);
+    params.set('limit', String(this.insightPageSize));
+    params.set('offset', String(this.insightPage * this.insightPageSize));
+    const data: { insights: InsightData[]; total: number } = await this.fetchApi(`/api/insights?${params}`);
+    this.insights = data.insights;
+    this.insightTotal = data.total;
+    const srcParams = new URLSearchParams();
+    srcParams.set('limit', String(this.insightPageSize));
+    srcParams.set('offset', String(this.insightSourcePage * this.insightPageSize));
+    const srcData: { sources: InsightSourceData[]; total: number } = await this.fetchApi(`/api/insights/sources?${srcParams}`);
+    this.insightSources = srcData.sources;
+    this.insightSourceTotal = srcData.total;
+    this.insightStats = await this.fetchApi('/api/insights/stats');
+  }
+  async searchInsights() {
+    this.insightPage = 0;
+    await this.loadInsights();
+  }
+  async setInsightPage(page: number) {
+    this.insightPage = page;
+    await this.loadInsights();
+  }
+  async setInsightSourcePage(page: number) {
+    this.insightSourcePage = page;
+    await this.loadInsights();
+  }
+  async deleteInsightItem(id: string) {
+    await this.fetchApi(`/api/insights/${id}`, { method: 'DELETE' });
+    delete this.insightDetails[id];
+    await this.loadInsights();
+  }
+  async loadInsightDetail(id: string) {
+    const detail = await this.fetchApi(`/api/insights/${id}`);
+    this.insightDetails = { ...this.insightDetails, [id]: detail };
   }
   async loadDebug() { this.debug = await this.fetchApi('/api/debug'); }
   async loadChatHistory() {

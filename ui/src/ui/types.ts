@@ -129,3 +129,42 @@ export interface MemorySearchResult {
   results: { docid: string; file: string; title: string; score: number; snippet: string }[];
   error?: string;
 }
+
+export interface InsightData {
+  id: string;
+  text: string;
+  detail: string | null;
+  category: string | null;
+  source_count: number;
+  first_seen: string;
+  last_seen: string;
+  group_folder: string;
+}
+
+export interface InsightSourceData {
+  id: string;
+  url: string;
+  title: string | null;
+  source_type: string;
+  metadata: string | null;
+  indexed_at: string;
+  insight_count: number;
+}
+
+export interface InsightDetailSource {
+  id: string;
+  url: string;
+  title: string | null;
+  source_type: string;
+  metadata: string | null;
+  indexed_at: string;
+  context: string | null;
+  timestamp_ref: string | null;
+}
+
+export interface InsightStatsData {
+  totalInsights: number;
+  totalSources: number;
+  topInsight: { text: string; source_count: number } | null;
+  categories: { category: string; count: number }[];
+}

@@ -163,14 +163,18 @@ async function runTask(
 
   const durationMs = Date.now() - startTime;
 
-  logTaskRun({
-    task_id: task.id,
-    run_at: new Date().toISOString(),
-    duration_ms: durationMs,
-    status: error ? 'error' : 'success',
-    result,
-    error,
-  });
+  try {
+    logTaskRun({
+      task_id: task.id,
+      run_at: new Date().toISOString(),
+      duration_ms: durationMs,
+      status: error ? 'error' : 'success',
+      result,
+      error,
+    });
+  } catch (logErr) {
+    logger.warn({ taskId: task.id, err: logErr }, 'Failed to log task run (non-fatal)');
+  }
 
   let nextRun: string | null = null;
   if (task.schedule_type === 'cron') {

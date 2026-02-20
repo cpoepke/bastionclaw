@@ -277,15 +277,18 @@ Use available_groups.json to find the JID for a group. The folder name should be
 
 server.tool(
   'refresh_memory_index',
-  'Re-index workspace files for semantic search. Run after creating or updating important documents.',
+  'Re-index workspace files for semantic search. Blocks until indexing is complete. Run after creating or updating important documents.',
   {},
   async () => {
-    writeIpcFile(TASKS_DIR, {
-      type: 'refresh_index',
-      groupFolder,
-      timestamp: new Date().toISOString(),
-    });
-    return { content: [{ type: 'text' as const, text: 'Memory index refresh requested.' }] };
+    try {
+      const result = await sendIpcRequest({
+        type: 'refresh_index',
+        groupFolder,
+      }, 60000);
+      return { content: [{ type: 'text' as const, text: `Memory index refreshed. ${JSON.stringify(result)}` }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `Index refresh failed: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+    }
   },
 );
 
@@ -410,6 +413,147 @@ server.tool(
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
     } catch (err) {
       return { content: [{ type: 'text' as const, text: `Get failed: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+    }
+  },
+);
+
+// --- Insight tracking tools ---
+
+server.tool(
+  'check_source',
+  'Check if a content source (URL, file) has already been indexed for insight extraction. Use before ingesting content to avoid duplicate processing.',
+  {
+    url: z.string().describe('The URL or file path of the content source'),
+  },
+  async (args) => {
+    try {
+      // Hash the URL locally for the check
+      const crypto = await import('crypto');
+      const urlHash = crypto.createHash('sha256').update(args.url.trim()).digest('hex');
+      const result = await sendIpcRequest({
+        type: 'insight_check_source',
+        urlHash,
+        groupFolder,
+      });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `Check failed: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+    }
+  },
+);
+
+server.tool(
+  'search_insights',
+  'Search existing insights using semantic and keyword search. Use to check if a similar insight already exists before adding a new one.',
+  {
+    query: z.string().max(500).describe('The insight text to search for'),
+    limit: z.number().optional().default(5).describe('Max results (default 5)'),
+  },
+  async (args) => {
+    try {
+      const result = await sendIpcRequest({
+        type: 'insight_search',
+        query: args.query,
+        limit: args.limit,
+        groupFolder,
+      });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `Search failed: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+    }
+  },
+);
+
+server.tool(
+  'add_insight',
+  'Add a new insight extracted from content. Creates the source record if needed, creates the insight, and links them. Also writes a markdown file for semantic indexing.',
+  {
+    text: z.string().describe('Bold thesis statement — a short, generalizable principle (10-20 words). Should be abstract enough that the same insight from a different source would use the same text.'),
+    detail: z.string().optional().describe('2-3 sentences expanding on the thesis with specific context and nuance.'),
+    source_url: z.string().describe('URL or file path of the content source'),
+    source_title: z.string().optional().describe('Title of the source'),
+    source_type: z.enum(['article', 'youtube', 'pdf', 'podcast', 'other']).describe('Type of content source'),
+    source_metadata: z.string().optional().describe('JSON string with extra metadata (author, channel, duration, etc.)'),
+    category: z.string().optional().describe('Insight category: strategy, technical, trend, etc.'),
+    context: z.string().optional().describe('Direct quote from the source supporting this insight'),
+    timestamp_ref: z.string().optional().describe('Video/audio timestamp like "12:34" or page number'),
+  },
+  async (args) => {
+    try {
+      const result = await sendIpcRequest({
+        type: 'insight_add',
+        insightText: args.text,
+        insightDetail: args.detail,
+        sourceUrl: args.source_url,
+        sourceTitle: args.source_title,
+        sourceType: args.source_type,
+        sourceMetadata: args.source_metadata,
+        category: args.category,
+        context: args.context,
+        timestampRef: args.timestamp_ref,
+        groupFolder,
+      });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `Add failed: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+    }
+  },
+);
+
+server.tool(
+  'link_insight_source',
+  'Link an existing insight to a new source. Use when you find an insight that semantically matches one already in the database. This bumps the source count, making frequently-corroborated insights rise to the top.',
+  {
+    insight_id: z.string().describe('ID of the existing insight to link'),
+    source_url: z.string().describe('URL or file path of the new source'),
+    source_title: z.string().optional().describe('Title of the source'),
+    source_type: z.enum(['article', 'youtube', 'pdf', 'podcast', 'other']).describe('Type of content source'),
+    source_metadata: z.string().optional().describe('JSON string with extra metadata'),
+    context: z.string().optional().describe('Supporting quote from the new source'),
+    timestamp_ref: z.string().optional().describe('Video/audio timestamp or page number'),
+  },
+  async (args) => {
+    try {
+      const result = await sendIpcRequest({
+        type: 'insight_link',
+        insightId: args.insight_id,
+        sourceUrl: args.source_url,
+        sourceTitle: args.source_title,
+        sourceType: args.source_type,
+        sourceMetadata: args.source_metadata,
+        context: args.context,
+        timestampRef: args.timestamp_ref,
+        groupFolder,
+      });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `Link failed: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+    }
+  },
+);
+
+server.tool(
+  'get_insights',
+  'List insights sorted by corroboration count or recency. Use to review the most well-supported insights across all ingested content.',
+  {
+    sort_by: z.enum(['source_count', 'recent']).default('source_count').describe('Sort order'),
+    limit: z.number().optional().default(20).describe('Max results'),
+    offset: z.number().optional().default(0).describe('Offset for pagination'),
+    category: z.string().optional().describe('Filter by category'),
+  },
+  async (args) => {
+    try {
+      const result = await sendIpcRequest({
+        type: 'insight_list',
+        sortBy: args.sort_by,
+        limit: args.limit,
+        offset: args.offset,
+        category: args.category,
+        groupFolder,
+      });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `List failed: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
     }
   },
 );

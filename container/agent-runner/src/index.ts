@@ -574,11 +574,12 @@ async function main(): Promise<void> {
         resumeAt = queryResult.lastAssistantUuid;
       }
 
-      // Progressive indexing: accumulate messages and export snapshot after each turn
+      // Progressive indexing: export snapshot after each turn, then release memory
       allMessages.push(...queryResult.messages);
       if (sessionId) {
         exportConversationSnapshot(allMessages, sessionId, containerInput.assistantName);
       }
+      allMessages.length = 0;
 
       // If _close was consumed during the query, exit immediately.
       // Don't emit a session-update marker (it would reset the host's

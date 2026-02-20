@@ -3,7 +3,7 @@ import path from 'path';
 
 export const ASSISTANT_NAME = process.env.ASSISTANT_NAME || 'Andy';
 export const POLL_INTERVAL = 2000;
-export const SCHEDULER_POLL_INTERVAL = 15000;
+export const SCHEDULER_POLL_INTERVAL = 5000;
 
 export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 export const TELEGRAM_ONLY = process.env.TELEGRAM_ONLY === 'true';

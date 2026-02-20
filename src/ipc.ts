@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -9,12 +10,18 @@ import { getQmdBin } from './qmd.js';
 import {
   ASSISTANT_NAME,
   DATA_DIR,
+  GROUPS_DIR,
   IPC_POLL_INTERVAL,
   MAIN_GROUP_FOLDER,
   TIMEZONE,
 } from './config.js';
 import { AvailableGroup } from './container-runner.js';
-import { createTask, deleteTask, getTaskById, updateTask } from './db.js';
+import {
+  createTask, deleteTask, getTaskById, updateTask,
+  hashSourceUrl, getSourceByHash, createSource, createInsight,
+  linkInsightSource, getTopInsights, searchInsightsKeyword,
+  type InsightSource,
+} from './db.js';
 import { logger } from './logger.js';
 import { RegisteredGroup } from './types.js';
 
@@ -180,6 +187,21 @@ export async function processTaskIpc(
     query?: string;
     mode?: string;
     docid?: string;
+    // For insight tracking
+    urlHash?: string;
+    sourceUrl?: string;
+    sourceTitle?: string;
+    sourceType?: string;
+    sourceMetadata?: string;
+    insightText?: string;
+    insightDetail?: string;
+    insightId?: string;
+    category?: string;
+    context?: string;
+    timestampRef?: string;
+    sortBy?: string;
+    limit?: number;
+    offset?: number;
   },
   sourceGroup: string, // Verified identity from IPC directory
   isMain: boolean, // Verified from directory path
@@ -386,13 +408,20 @@ export async function processTaskIpc(
     case 'refresh_index': {
       // Always use directory-derived sourceGroup (trusted), never the payload's groupFolder
       const folder = sourceGroup;
+      const requestId = data.requestId as string | undefined;
       try {
         // update discovers new/changed files, embed creates vectors
         execFileSync(getQmdBin(), ['update'], { timeout: 30000, stdio: 'pipe' });
         execFileSync(getQmdBin(), ['embed', '-c', folder], { timeout: 30000, stdio: 'pipe' });
         logger.info({ folder }, 'qmd index refreshed');
+        if (requestId) {
+          writeIpcResponse(sourceGroup, requestId, { ok: true });
+        }
       } catch (err) {
         logger.warn({ folder, err }, 'qmd embed failed (non-fatal)');
+        if (requestId) {
+          writeIpcResponse(sourceGroup, requestId, { ok: false, error: err instanceof Error ? err.message : String(err) });
+        }
       }
       break;
     }
@@ -447,6 +476,175 @@ export async function processTaskIpc(
           error: err instanceof Error ? err.message : String(err),
         });
       }
+      break;
+    }
+
+    case 'insight_check_source': {
+      const requestId = data.requestId;
+      if (!requestId || !data.urlHash) break;
+      const source = getSourceByHash(data.urlHash);
+      writeIpcResponse(sourceGroup, requestId, {
+        exists: !!source,
+        source: source ? { id: source.id, title: source.title, indexed_at: source.indexed_at } : undefined,
+      });
+      break;
+    }
+
+    case 'insight_search': {
+      const requestId = data.requestId;
+      if (!requestId || !data.query) break;
+      const limit = data.limit || 5;
+
+      // Try qmd hybrid search first, fall back to keyword
+      let results: { id: string; text: string; source_count: number; category: string | null; score: number }[] = [];
+      try {
+        const qmdResult = execFileSync(getQmdBin(), ['query', '--json', data.query], {
+          timeout: 30000,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          encoding: 'utf-8',
+        });
+        const qmdHits = JSON.parse(qmdResult) as { docid: string; score: number; snippet?: string }[];
+        // Match qmd results to insight records by checking if docid contains insight ID
+        for (const hit of qmdHits.slice(0, limit)) {
+          // Insight files are named {id}.md in insights/ dir
+          // qmd returns file path in 'file' field (e.g. qmd://main/insights/{id}.md), not in 'docid'
+          const fileField = (hit as Record<string, unknown>).file as string | undefined;
+          const idMatch = (fileField || hit.docid).match(/insights\/([a-f0-9-]+)\.md/);
+          if (idMatch) {
+            const insight = searchInsightsKeyword(sourceGroup, '').find(i => i.id === idMatch[1]);
+            if (insight) {
+              results.push({
+                id: insight.id,
+                text: insight.text,
+                source_count: insight.source_count,
+                category: insight.category,
+                score: hit.score,
+              });
+            }
+          }
+        }
+      } catch {
+        // qmd not available, fall back to keyword search
+      }
+
+      // Supplement with keyword search if qmd didn't find enough
+      if (results.length < limit) {
+        const keywordResults = searchInsightsKeyword(sourceGroup, data.query, limit);
+        for (const insight of keywordResults) {
+          if (!results.find(r => r.id === insight.id)) {
+            results.push({
+              id: insight.id,
+              text: insight.text,
+              source_count: insight.source_count,
+              category: insight.category,
+              score: 0,
+            });
+          }
+        }
+        results = results.slice(0, limit);
+      }
+
+      logger.info({ query: data.query.slice(0, 80), resultCount: results.length, topScore: results[0]?.score }, 'Insight search via IPC');
+      writeIpcResponse(sourceGroup, requestId, { results });
+      break;
+    }
+
+    case 'insight_add': {
+      const requestId = data.requestId;
+      if (!requestId || !data.insightText || !data.sourceUrl || !data.sourceType) break;
+
+      const now = new Date().toISOString();
+      const sourceHash = hashSourceUrl(data.sourceUrl);
+      const insightId = crypto.randomUUID();
+
+      // Create source if needed
+      const existingSource = getSourceByHash(sourceHash);
+      if (!existingSource) {
+        createSource({
+          id: sourceHash,
+          url: data.sourceUrl,
+          title: data.sourceTitle ?? null,
+          source_type: data.sourceType,
+          metadata: data.sourceMetadata ?? null,
+          indexed_at: now,
+        });
+      }
+
+      // Create insight
+      createInsight({
+        id: insightId,
+        text: data.insightText,
+        detail: data.insightDetail ?? null,
+        category: data.category ?? null,
+        source_count: 1,
+        first_seen: now,
+        last_seen: now,
+        group_folder: sourceGroup,
+      });
+
+      // Link them
+      linkInsightSource(insightId, sourceHash, data.context, data.timestampRef);
+
+      // Write markdown for qmd indexing (must be under GROUPS_DIR so qmd indexes it)
+      const insightsDir = path.join(GROUPS_DIR, sourceGroup, 'insights');
+      fs.mkdirSync(insightsDir, { recursive: true });
+      const detailBlock = data.insightDetail ? `\n${data.insightDetail}\n` : '';
+      const mdContent = `# ${data.insightText}\n${detailBlock}\nCategory: ${data.category || 'general'}\nSource: ${data.sourceUrl}\n`;
+      fs.writeFileSync(path.join(insightsDir, `${insightId}.md`), mdContent);
+
+      writeIpcResponse(sourceGroup, requestId, {
+        insight_id: insightId,
+        source_id: sourceHash,
+        is_new: true,
+      });
+      logger.info({ insightId, sourceGroup }, 'Insight created via IPC');
+      break;
+    }
+
+    case 'insight_link': {
+      const requestId = data.requestId;
+      if (!requestId || !data.insightId || !data.sourceUrl || !data.sourceType) break;
+
+      const now = new Date().toISOString();
+      const sourceHash = hashSourceUrl(data.sourceUrl);
+
+      // Create source if needed
+      const existingSource = getSourceByHash(sourceHash);
+      if (!existingSource) {
+        createSource({
+          id: sourceHash,
+          url: data.sourceUrl,
+          title: data.sourceTitle ?? null,
+          source_type: data.sourceType,
+          metadata: data.sourceMetadata ?? null,
+          indexed_at: now,
+        });
+      }
+
+      // Link and bump count
+      linkInsightSource(data.insightId, sourceHash, data.context, data.timestampRef);
+
+      // Get updated count
+      const updated = getTopInsights(sourceGroup, 1, 0).insights.find(i => i.id === data.insightId);
+
+      writeIpcResponse(sourceGroup, requestId, {
+        insight_id: data.insightId,
+        source_id: sourceHash,
+        new_source_count: updated?.source_count ?? 1,
+      });
+      logger.info({ insightId: data.insightId, sourceGroup }, 'Insight source linked via IPC');
+      break;
+    }
+
+    case 'insight_list': {
+      const requestId = data.requestId;
+      if (!requestId) break;
+
+      const sortBy = data.sortBy === 'recent' ? 'recent' : 'source_count';
+      const limit = data.limit || 20;
+      const offset = data.offset || 0;
+      const result = getTopInsights(sourceGroup, limit, offset, data.category, sortBy as 'source_count' | 'recent');
+      writeIpcResponse(sourceGroup, requestId, result);
       break;
     }
 

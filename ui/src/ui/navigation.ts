@@ -6,6 +6,7 @@ export type TabId =
   | 'overview'
   | 'channels'
   | 'memory'
+  | 'insights'
   | 'groups'
   | 'messages'
   | 'tasks'
@@ -44,6 +45,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Operations',
     items: [
+      { id: 'insights', label: 'Insights', icon: icons.lightbulb },
       { id: 'groups', label: 'Groups', icon: icons.folder },
       { id: 'messages', label: 'Messages', icon: icons.fileText },
       { id: 'tasks', label: 'Tasks', icon: icons.zap },
@@ -67,6 +69,7 @@ export function tabDescription(tab: TabId): string {
     case 'overview': return 'System status and health.';
     case 'channels': return 'WhatsApp and Telegram status.';
     case 'memory': return 'Semantic memory index, collections, and search.';
+    case 'insights': return 'Collected insights ranked by corroboration.';
     case 'groups': return 'Registered groups and their configuration.';
     case 'messages': return 'Message history by group.';
     case 'tasks': return 'Scheduled tasks and run logs.';
