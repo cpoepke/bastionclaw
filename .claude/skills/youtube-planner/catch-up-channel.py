@@ -118,51 +118,53 @@ def main():
 
         print(f"  [{i}/{len(non_shorts)}] → {channel_name}/{slug}")
 
-        # Skip transcript fetch if already indexed for insights (saves API tokens)
-        if is_insight_indexed(vid):
-            print(f"    Already indexed — skipping transcript")
-            skipped_indexed += 1
-        else:
-            # Check transcript cache on disk
-            cache_search = subprocess.run([
-                'find', str(base), '-path', f'*/{channel_name}/{slug}/transcript.txt'
-            ], capture_output=True, text=True)
+        # Check if transcript already on disk
+        has_transcript = (video_dir / 'transcript.json').exists()
+        indexed = is_insight_indexed(vid)
 
-            if not cache_search.stdout.strip():
-                print(f"    Fetching transcript...")
-                fetch_result = subprocess.run([
-                    'curl', '-s',
-                    f'https://transcriptapi.com/api/v2/youtube/transcript?video_url={vid}&format=json&include_timestamp=true&send_metadata=true',
-                    '-H', f'Authorization: Bearer {api_key}'
-                ], capture_output=True, text=True)
-
-                if fetch_result.returncode == 0:
-                    try:
-                        transcript_data = json.loads(fetch_result.stdout)
-                        if 'error' not in transcript_data:
-                            # Check duration — skip shorts (< 120s)
-                            segments = transcript_data.get('transcript', [])
-                            duration = segments[-1].get('start', 0) if segments else 0
-                            if duration < 120:
-                                print(f"    Short ({int(duration)}s) — skipping")
-                                skipped_shorts += 1
-                                time.sleep(0.25)
-                            else:
-                                with open(video_dir / 'transcript.json', 'w') as f:
-                                    json.dump(transcript_data, f, indent=2)
-                                with open(video_dir / 'transcript.txt', 'w') as f:
-                                    for item in segments:
-                                        start = item.get('start', 0)
-                                        text = item.get('text', '')
-                                        f.write(f"[{start}s] {text}\n")
-                                transcript_count += 1
-                                time.sleep(0.25)  # Rate limiting
-                        else:
-                            print(f"    Error: {transcript_data.get('error')}")
-                    except json.JSONDecodeError:
-                        print(f"    Error: Invalid JSON response")
+        if has_transcript:
+            if indexed:
+                print(f"    Already indexed + transcript cached")
+                skipped_indexed += 1
             else:
                 print(f"    Using cached transcript")
+        else:
+            # Always fetch transcript if missing on disk, even if indexed
+            # (the agent path can index without saving transcript to disk)
+            print(f"    Fetching transcript...{' (indexed but missing on disk)' if indexed else ''}")
+            fetch_result = subprocess.run([
+                'curl', '-s',
+                f'https://transcriptapi.com/api/v2/youtube/transcript?video_url={vid}&format=json&include_timestamp=true&send_metadata=true',
+                '-H', f'Authorization: Bearer {api_key}'
+            ], capture_output=True, text=True)
+
+            if fetch_result.returncode == 0:
+                try:
+                    transcript_data = json.loads(fetch_result.stdout)
+                    if 'error' not in transcript_data:
+                        # Check duration — skip shorts (< 120s)
+                        segments = transcript_data.get('transcript', [])
+                        duration = segments[-1].get('start', 0) if segments else 0
+                        if duration < 120:
+                            print(f"    Short ({int(duration)}s) — skipping")
+                            skipped_shorts += 1
+                            time.sleep(0.25)
+                        else:
+                            with open(video_dir / 'transcript.json', 'w') as f:
+                                json.dump(transcript_data, f, indent=2)
+                            with open(video_dir / 'transcript.txt', 'w') as f:
+                                for item in segments:
+                                    start = item.get('start', 0)
+                                    text = item.get('text', '')
+                                    f.write(f"[{start}s] {text}\n")
+                            transcript_count += 1
+                            time.sleep(0.25)  # Rate limiting
+                    else:
+                        print(f"    Error: {transcript_data.get('error')}")
+                except json.JSONDecodeError:
+                    print(f"    Error: Invalid JSON response")
+            if indexed:
+                skipped_indexed += 1
 
         # Compute duration from transcript if available
         duration_seconds = None
