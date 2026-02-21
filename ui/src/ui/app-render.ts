@@ -7,6 +7,7 @@ import { renderChat } from './views/chat.ts';
 import { renderChannels } from './views/channels.ts';
 import { renderMemory } from './views/memory.ts';
 import { renderInsights } from './views/insights.ts';
+import { renderYouTube } from './views/youtube.ts';
 import { renderGroups } from './views/groups.ts';
 import { renderMessages } from './views/messages.ts';
 import { renderTasks } from './views/tasks.ts';
@@ -77,6 +78,7 @@ export function renderApp(state: NanoClawApp) {
         ${state.tab === 'channels' ? renderChannels(state) : nothing}
         ${state.tab === 'memory' ? renderMemory(state) : nothing}
         ${state.tab === 'insights' ? renderInsights(state) : nothing}
+        ${state.tab === 'youtube' ? renderYouTube(state) : nothing}
         ${state.tab === 'groups' ? renderGroups(state) : nothing}
         ${state.tab === 'messages' ? renderMessages(state) : nothing}
         ${state.tab === 'tasks' ? renderTasks(state) : nothing}

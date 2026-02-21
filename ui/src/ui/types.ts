@@ -168,3 +168,41 @@ export interface InsightStatsData {
   topInsight: { text: string; source_count: number } | null;
   categories: { category: string; count: number }[];
 }
+
+export interface InsightActivityData {
+  sourceTypeBreakdown: { source_type: string; count: number }[];
+  categoryDistribution: { category: string; count: number }[];
+  recentActivity: { last24h: number; last7d: number; last30d: number };
+  avgSourcesPerInsight: number;
+  lastRefresh: string | null;
+  pipelineLog: string[];
+}
+
+export interface YouTubeVideoData {
+  videoId: string;
+  title: string;
+  author: string;
+  published: string;
+  views: number;
+  vph: number;
+  thumbnail: string;
+  link: string;
+  sparklinePoints: number[];
+  snapshotCount: number;
+  trendDirection: 'accelerating' | 'decelerating' | 'flat';
+  duration: number | null;
+}
+
+export interface YouTubeSourceData {
+  handle: string;
+}
+
+export interface YouTubeDashboardData {
+  videos: YouTubeVideoData[];
+  lastUpdated: string;
+}
+
+export interface YouTubeSourcesData {
+  sources: YouTubeSourceData[];
+  lookbackDays: number;
+}

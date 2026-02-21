@@ -295,7 +295,8 @@ def main():
     RECYCLE_EVERY = 8  # Recycle container to prevent session accumulation
 
     for i, video in enumerate(unindexed):
-        print(f'[{i+1}/{len(unindexed)}] {video["title"] or video["video_id"]}')
+        pct = int((i / len(unindexed)) * 100)
+        print(f'[{i+1}/{len(unindexed)}] ({pct}%) {video["title"] or video["video_id"]}')
 
         try:
             # Recycle container every N videos to prevent session bloat
@@ -326,7 +327,8 @@ def main():
             db = db_new
 
             if waited < 0:
-                print(f'  TIMEOUT after 600s — killing container')
+                pct = int(((i + 1) / len(unindexed)) * 100)
+                print(f'  TIMEOUT after 600s — killing container ({pct}% done)')
                 errors += 1
 
                 # Kill the running container so host releases the group queue
@@ -365,7 +367,8 @@ def main():
                     WHERE s.url LIKE ?''',
                     (f'%{video["video_id"]}%',)
                 ).fetchone()[0]
-                print(f'  Indexed in {waited}s: {links} insights linked')
+                pct = int(((i + 1) / len(unindexed)) * 100)
+                print(f'  Indexed in {waited}s: {links} insights linked ({pct}% done)')
 
         except KeyboardInterrupt:
             print('\nInterrupted by user')

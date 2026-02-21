@@ -819,6 +819,59 @@ export function searchInsightsKeyword(groupFolder: string, query: string, limit 
   ).all(groupFolder, pattern, limit) as Insight[];
 }
 
+export function getInsightActivity(groupFolder: string): {
+  sourceTypeBreakdown: { source_type: string; count: number }[];
+  categoryDistribution: { category: string; count: number }[];
+  recentActivity: { last24h: number; last7d: number; last30d: number };
+  avgSourcesPerInsight: number;
+  lastRefresh: string | null;
+} {
+  const sourceTypeBreakdown = db.prepare(
+    `SELECT s.source_type, COUNT(DISTINCT s.id) as count
+     FROM insight_sources s
+     JOIN insight_source_links l ON l.source_id = s.id
+     JOIN insights i ON i.id = l.insight_id
+     WHERE i.group_folder = ?
+     GROUP BY s.source_type ORDER BY count DESC`,
+  ).all(groupFolder) as { source_type: string; count: number }[];
+
+  const categoryDistribution = db.prepare(
+    `SELECT COALESCE(category, 'uncategorized') as category, COUNT(*) as count
+     FROM insights WHERE group_folder = ? GROUP BY category ORDER BY count DESC`,
+  ).all(groupFolder) as { category: string; count: number }[];
+
+  const last24h = (db.prepare(
+    "SELECT COUNT(*) as count FROM insights WHERE group_folder = ? AND first_seen >= datetime('now', '-1 day')",
+  ).get(groupFolder) as { count: number }).count;
+  const last7d = (db.prepare(
+    "SELECT COUNT(*) as count FROM insights WHERE group_folder = ? AND first_seen >= datetime('now', '-7 days')",
+  ).get(groupFolder) as { count: number }).count;
+  const last30d = (db.prepare(
+    "SELECT COUNT(*) as count FROM insights WHERE group_folder = ? AND first_seen >= datetime('now', '-30 days')",
+  ).get(groupFolder) as { count: number }).count;
+
+  const avgRow = db.prepare(
+    'SELECT AVG(source_count) as avg FROM insights WHERE group_folder = ?',
+  ).get(groupFolder) as { avg: number | null };
+  const avgSourcesPerInsight = Math.round((avgRow.avg || 0) * 100) / 100;
+
+  const lastRefreshRow = db.prepare(
+    `SELECT MAX(s.indexed_at) as last_refresh
+     FROM insight_sources s
+     JOIN insight_source_links l ON l.source_id = s.id
+     JOIN insights i ON i.id = l.insight_id
+     WHERE i.group_folder = ?`,
+  ).get(groupFolder) as { last_refresh: string | null };
+
+  return {
+    sourceTypeBreakdown,
+    categoryDistribution,
+    recentActivity: { last24h, last7d, last30d },
+    avgSourcesPerInsight,
+    lastRefresh: lastRefreshRow.last_refresh,
+  };
+}
+
 // --- JSON migration ---
 
 function migrateJsonState(): void {

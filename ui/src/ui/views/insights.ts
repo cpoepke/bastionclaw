@@ -49,6 +49,77 @@ export function renderInsights(state: NanoClawApp) {
       </div>
     ` : nothing}
 
+    <!-- Activity panel (collapsible) -->
+    ${state.insightActivity ? html`
+      <details class="card" style="margin-bottom: 16px;">
+        <summary style="cursor: pointer; font-weight: 600; padding: 12px;">Pipeline Activity & Analytics</summary>
+        <div style="padding: 0 12px 12px;">
+
+          <!-- Recent activity row -->
+          <div class="card-grid" style="margin-top: 12px;">
+            <div class="card" style="background: var(--bg);">
+              <div class="card-title">Last 24h</div>
+              <div class="stat-value">${state.insightActivity.recentActivity.last24h}</div>
+              <div class="muted" style="font-size: 11px;">new insights</div>
+            </div>
+            <div class="card" style="background: var(--bg);">
+              <div class="card-title">Last 7d</div>
+              <div class="stat-value">${state.insightActivity.recentActivity.last7d}</div>
+              <div class="muted" style="font-size: 11px;">new insights</div>
+            </div>
+            <div class="card" style="background: var(--bg);">
+              <div class="card-title">Last 30d</div>
+              <div class="stat-value">${state.insightActivity.recentActivity.last30d}</div>
+              <div class="muted" style="font-size: 11px;">new insights</div>
+            </div>
+            <div class="card" style="background: var(--bg);">
+              <div class="card-title">Avg Sources/Insight</div>
+              <div class="stat-value">${state.insightActivity.avgSourcesPerInsight}</div>
+            </div>
+          </div>
+
+          <!-- Source type breakdown -->
+          ${state.insightActivity.sourceTypeBreakdown.length > 0 ? html`
+            <div style="margin-top: 12px;">
+              <div class="card-title" style="margin-bottom: 8px;">Source Types</div>
+              <div class="chip-row">
+                ${state.insightActivity.sourceTypeBreakdown.map(s => html`
+                  <span class="chip">${s.source_type}: ${s.count}</span>
+                `)}
+              </div>
+            </div>
+          ` : nothing}
+
+          <!-- Category distribution -->
+          ${state.insightActivity.categoryDistribution.length > 0 ? html`
+            <div style="margin-top: 12px;">
+              <div class="card-title" style="margin-bottom: 8px;">Categories</div>
+              <div class="chip-row">
+                ${state.insightActivity.categoryDistribution.map(c => html`
+                  <span class="chip chip-ok">${c.category}: ${c.count}</span>
+                `)}
+              </div>
+            </div>
+          ` : nothing}
+
+          <!-- Last refresh -->
+          ${state.insightActivity.lastRefresh ? html`
+            <div class="muted" style="margin-top: 12px; font-size: 12px;">
+              Last source indexed: ${formatAgo(new Date(state.insightActivity.lastRefresh).getTime())}
+            </div>
+          ` : nothing}
+
+          <!-- Pipeline log -->
+          ${state.insightActivity.pipelineLog.length > 0 ? html`
+            <details style="margin-top: 12px;">
+              <summary class="muted" style="cursor: pointer; font-size: 12px;">Pipeline Log (${state.insightActivity.pipelineLog.length} lines)</summary>
+              <pre style="margin-top: 8px; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: 11px; max-height: 300px; overflow: auto; white-space: pre-wrap;">${state.insightActivity.pipelineLog.join('\n')}</pre>
+            </details>
+          ` : nothing}
+        </div>
+      </details>
+    ` : nothing}
+
     <!-- Search and filter -->
     <section class="card">
       <div class="row" style="justify-content: space-between; flex-wrap: wrap; gap: 8px;">

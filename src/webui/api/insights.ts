@@ -8,6 +8,7 @@ import {
   getInsightsBySource,
   getSourceByHash,
   getInsightStats,
+  getInsightActivity,
   searchInsightsKeyword,
 } from '../../db.js';
 
@@ -40,6 +41,26 @@ export function registerInsightRoutes(app: FastifyInstance): void {
   app.get<{ Querystring: { group?: string } }>('/api/insights/stats', async (req) => {
     const groupFolder = req.query.group || 'main';
     return getInsightStats(groupFolder);
+  });
+
+  // Activity — source type breakdown, recent activity, pipeline log
+  app.get<{ Querystring: { group?: string } }>('/api/insights/activity', async (req) => {
+    const groupFolder = req.query.group || 'main';
+    const activity = getInsightActivity(groupFolder);
+
+    // Read pipeline log (last 50 lines)
+    let pipelineLog: string[] = [];
+    try {
+      const fs = await import('fs');
+      const logPath = '/tmp/refresh-insights.log';
+      if (fs.existsSync(logPath)) {
+        const content = fs.readFileSync(logPath, 'utf-8');
+        const lines = content.split('\n').filter(Boolean);
+        pipelineLog = lines.slice(-50);
+      }
+    } catch { /* ignore */ }
+
+    return { ...activity, pipelineLog };
   });
 
   // List all sources — must be before /:id

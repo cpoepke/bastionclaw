@@ -7,7 +7,8 @@ import type {
   OverviewData, ChannelData, GroupData, TaskData,
   SessionData, SkillData, ConfigData, DebugData,
   LogEntry, MessageData, MemoryData, MemorySearchResult,
-  InsightData, InsightSourceData, InsightStatsData,
+  InsightData, InsightSourceData, InsightStatsData, InsightActivityData,
+  YouTubeDashboardData, YouTubeSourcesData,
 } from './types.ts';
 
 @customElement('nanoclaw-app')
@@ -76,7 +77,15 @@ export class NanoClawApp extends LitElement {
   @state() insightDetails: Record<string, any> = {};
   @state() insightPage = 0;
   @state() insightSourcePage = 0;
+  @state() insightActivity: InsightActivityData | null = null;
   insightPageSize = 20;
+
+  // YouTube
+  @state() youtubeDashboard: YouTubeDashboardData | null = null;
+  @state() youtubeSources: YouTubeSourcesData | null = null;
+  @state() youtubeSortBy = 'vph';
+  @state() youtubeSortDesc = true;
+  @state() youtubeNewHandle = '';
 
   // Debug
   @state() debug: DebugData | null = null;
@@ -153,6 +162,7 @@ export class NanoClawApp extends LitElement {
         case 'channels': await this.loadChannels(); break;
         case 'memory': await this.loadMemory(); break;
         case 'insights': await this.loadInsights(); break;
+        case 'youtube': await this.loadYouTube(); break;
         case 'groups': await this.loadGroups(); break;
         case 'messages': await this.loadMessages(); break;
         case 'tasks': await this.loadTasks(); break;
@@ -217,6 +227,7 @@ export class NanoClawApp extends LitElement {
     this.insightSources = srcData.sources;
     this.insightSourceTotal = srcData.total;
     this.insightStats = await this.fetchApi('/api/insights/stats');
+    this.insightActivity = await this.fetchApi('/api/insights/activity');
   }
   async searchInsights() {
     this.insightPage = 0;
@@ -238,6 +249,32 @@ export class NanoClawApp extends LitElement {
   async loadInsightDetail(id: string) {
     const detail = await this.fetchApi(`/api/insights/${id}`);
     this.insightDetails = { ...this.insightDetails, [id]: detail };
+  }
+  async loadYouTube() {
+    this.youtubeDashboard = await this.fetchApi('/api/youtube/dashboard');
+    this.youtubeSources = await this.fetchApi('/api/youtube/sources');
+  }
+  sortYouTubeBy(col: string) {
+    if (this.youtubeSortBy === col) {
+      this.youtubeSortDesc = !this.youtubeSortDesc;
+    } else {
+      this.youtubeSortBy = col;
+      this.youtubeSortDesc = true;
+    }
+    this.requestUpdate();
+  }
+  async addYouTubeSource() {
+    if (!this.youtubeNewHandle.trim()) return;
+    await this.fetchApi('/api/youtube/sources', {
+      method: 'POST',
+      body: JSON.stringify({ handle: this.youtubeNewHandle.trim() }),
+    });
+    this.youtubeNewHandle = '';
+    await this.loadYouTube();
+  }
+  async removeYouTubeSource(handle: string) {
+    await this.fetchApi(`/api/youtube/sources/${encodeURIComponent(handle)}`, { method: 'DELETE' });
+    await this.loadYouTube();
   }
   async loadDebug() { this.debug = await this.fetchApi('/api/debug'); }
   async loadChatHistory() {
