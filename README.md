@@ -115,6 +115,10 @@ WSL2 shuts down when you close all terminal windows. To keep BastionClaw running
 - **Optional integrations** — Add Gmail (`/add-gmail`) and more via skills
 - **Semantic memory** — Long-term memory powered by [qmd](https://github.com/tobi/qmd) with hybrid search (BM25 + vector + LLM reranking). Conversations are progressively indexed mid-session and archived at compaction. The agent naturally recalls past discussions without being asked. Runs fully local with GGUF models (~2GB) — no cloud APIs needed. See [docs/MEMORY.md](docs/MEMORY.md) for architecture details.
 - **Insight engine** — Ingest articles, YouTube videos, PDFs, and podcasts to extract generalizable insights. The system deduplicates semantically — when multiple independent sources express the same idea, they merge and the insight's corroboration count rises. Top insights surface the most widely-observed principles across all your content. See [docs/INSIGHTS.md](docs/INSIGHTS.md) for architecture details.
+
+<p align="center">
+  <img src="docs/insights-architecture-overview.png" alt="Insight Tracking System" width="600">
+</p>
 - **Web control panel** — Browser-based UI for monitoring, chat, and management
 
 ## Web Interface
@@ -145,6 +149,19 @@ cd ui && npm install && npm run build
 ```
 
 The port can be changed with the `WEBUI_PORT` environment variable (default: `3100`).
+
+## Data to Wisdom Pipeline
+
+BastionClaw turns raw content into actionable knowledge through a four-stage pipeline:
+
+1. **Data** — Monitor YouTube channels, ingest articles, PDFs, and podcasts. The system pulls transcripts and metadata automatically.
+2. **Insights** — An AI agent extracts 10-15 generalizable principles per source, each with category, context quote, and timestamp attribution.
+3. **Knowledge** — Semantic deduplication merges insights across sources. When 5 creators independently say the same thing, it's signal — not noise. Corroboration count drives ranking.
+4. **Wisdom** — Gap analysis identifies what nobody is saying yet. Human + AI review the corroborated insights to plan content strategy, identify trends, and make decisions.
+
+<p align="center">
+  <img src="docs/data-to-wisdom-pipeline.png" alt="Data to Wisdom Pipeline" width="600">
+</p>
 
 ## Usage
 
