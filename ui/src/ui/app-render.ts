@@ -1,5 +1,5 @@
 import { html, nothing } from 'lit';
-import type { NanoClawApp } from './app.ts';
+import type { BastionClawApp } from './app.ts';
 import { NAV_GROUPS, tabDescription } from './navigation.ts';
 import { renderIcon } from './icons.ts';
 import { renderOverview } from './views/overview.ts';
@@ -17,7 +17,7 @@ import { renderConfig } from './views/config.ts';
 import { renderLogs } from './views/logs.ts';
 import { renderDebug } from './views/debug.ts';
 
-export function renderApp(state: NanoClawApp) {
+export function renderApp(state: BastionClawApp) {
   const isChat = state.tab === 'chat';
 
   return html`
@@ -27,7 +27,7 @@ export function renderApp(state: NanoClawApp) {
         <div class="topbar-left">
           <div class="brand">
             <div class="brand-text">
-              <div class="brand-title">NanoClaw</div>
+              <div class="brand-title">BastionClaw</div>
               <div class="brand-sub">Control Panel</div>
             </div>
           </div>

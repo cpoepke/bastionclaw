@@ -1,7 +1,7 @@
 import { html, nothing } from 'lit';
-import type { NanoClawApp } from '../app.ts';
+import type { BastionClawApp } from '../app.ts';
 
-export function renderConfig(state: NanoClawApp) {
+export function renderConfig(state: BastionClawApp) {
   const config = state.config;
 
   return html`

@@ -1,14 +1,14 @@
 <p align="center">
-  <img src="assets/nanoclaw-hard-shell-logo.png" alt="NanoClaw Hard Shell" width="400">
+  <img src="assets/bastionclaw-logo.png" alt="BastionClaw" width="400">
 </p>
 
 <p align="center">
-  A personal Claude assistant that runs securely in containers. Forked from <a href="https://github.com/qwibitai/nanoclaw">NanoClaw</a> with Telegram as the default channel, a built-in web control panel, and cybersecurity-focused customizations.
+  A personal Claude assistant that runs securely in containers. Forked from <a href="https://github.com/qwibitai/nanoclaw">NanoClaw</a> with Telegram as the default channel, a built-in web control panel, and cybersecurity-focused customizations. Formerly known as NanoClaw Hard Shell.
 </p>
 
 ## About This Fork
 
-**NanoClaw Hard Shell** is a fork of [NanoClaw](https://github.com/qwibitai/nanoclaw), an awesome lightweight personal Claude assistant. This fork makes the following changes:
+**BastionClaw** (formerly NanoClaw Hard Shell) is a fork of [NanoClaw](https://github.com/qwibitai/nanoclaw), an awesome lightweight personal Claude assistant. This fork makes the following changes:
 
 - **Telegram by default** — Uses Telegram Bot API (via Grammy) instead of WhatsApp as the primary channel
 - **Web control panel** — Built-in Fastify + Lit web UI for monitoring, chat, and management
@@ -37,8 +37,8 @@ The upstream project's philosophy of "skills over features" means these customiz
 ### macOS / Linux
 
 ```bash
-git clone https://github.com/harperaa/nanoclaw-hard-shell.git
-cd nanoclaw-hard-shell
+git clone https://github.com/harperaa/bastionclaw.git
+cd bastionclaw
 claude
 ```
 
@@ -85,8 +85,8 @@ npm install -g @anthropic-ai/claude-code
 
 ```bash
 cd ~
-git clone https://github.com/harperaa/nanoclaw-hard-shell.git
-cd nanoclaw-hard-shell
+git clone https://github.com/harperaa/bastionclaw.git
+cd bastionclaw
 claude
 ```
 
@@ -94,7 +94,7 @@ Then run `/setup-windows`. Claude Code validates your WSL2 environment, installs
 
 #### Keeping It Running
 
-WSL2 shuts down when you close all terminal windows. To keep NanoClaw running:
+WSL2 shuts down when you close all terminal windows. To keep BastionClaw running:
 
 - **Option A:** Keep a terminal window open
 - **Option B:** After setup completes, the systemd service keeps it running as long as WSL2 is active. To prevent WSL2 from shutting down, create a Windows scheduled task that runs `wsl -d Ubuntu -e sleep infinity` at login
@@ -114,7 +114,7 @@ WSL2 shuts down when you close all terminal windows. To keep NanoClaw running:
 
 ## Web Interface
 
-NanoClaw Hard Shell includes a built-in web control panel that starts automatically alongside the main process at `http://localhost:3100`.
+BastionClaw includes a built-in web control panel that starts automatically alongside the main process at `http://localhost:3100`.
 
 ### Tabs
 
@@ -232,7 +232,7 @@ Agents run in containers, not behind application-level permission checks. They c
 
 **How do I debug issues?**
 
-Run `claude`, then run `/debug`. Check `logs/nanoclaw.log` and `logs/nanoclaw.error.log` for details.
+Run `claude`, then run `/debug`. Check `logs/bastionclaw.log` and `logs/bastionclaw.error.log` for details.
 
 ## Upstream
 

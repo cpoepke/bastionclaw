@@ -94,16 +94,26 @@ Keep it minimal and readable. No unnecessary decoration.
 
 ## Output Location
 
-- Architecture diagrams: `docs/<name>.png`
-- Blog images: user-specified path
-- Default: `output.png` in project root
+**CRITICAL: Never overwrite existing images.** Always append a timestamp to the filename so previous versions are preserved. Gemini generates a new image from scratch every time — there is no way to edit an existing image, so keeping prior versions is essential.
+
+**Naming format:** `docs/<name>-<YYYYMMDD-HHMM>.png`
+
+Examples:
+- `docs/data-to-wisdom-pipeline-20260221-1430.png`
+- `docs/openclaw-vs-bastionclaw-security-20260221-1445.png`
+
+- Architecture diagrams: `docs/<name>-<timestamp>.png`
+- Blog images: user-specified path with timestamp
+- Default: `output-<timestamp>.png` in project root
+
+When the user picks a final version to use in docs, symlink or copy it to the clean name (e.g., `docs/data-to-wisdom-pipeline.png`).
 
 ## Process
 
 1. Understand what the user wants to visualize
 2. Construct the prompt using the style guide above
 3. Choose appropriate aspect ratio (default `16:9` for diagrams)
-4. Choose output path (default `docs/` for architecture diagrams)
+4. Generate output path with timestamp: `docs/<name>-$(date +%Y%m%d-%H%M).png`
 5. Run `node scripts/generate-image.js "<prompt>" "<path>" -ar <ratio>`
 6. Read the generated image to verify quality
 7. If the user wants it linked in docs, update the relevant `.md` file

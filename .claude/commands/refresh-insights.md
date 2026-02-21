@@ -12,12 +12,12 @@ Interactive command to manage YouTube sources and run the full insight extractio
 Check that required API keys are available in `.env`:
 
 ```bash
-grep -c 'TRANSCRIPT_API_KEY' /Users/allenharper/nanoclaw/.env 2>/dev/null
+grep -c 'TRANSCRIPT_API_KEY' /Users/allenharper/bastionclaw/.env 2>/dev/null
 ```
 
 If `TRANSCRIPT_API_KEY` is not in `.env`, tell the user:
 > TRANSCRIPT_API_KEY is required for fetching YouTube transcripts via TranscriptAPI.
-> Add it to `/Users/allenharper/nanoclaw/.env`
+> Add it to `/Users/allenharper/bastionclaw/.env`
 
 Do not proceed until the key is confirmed.
 
@@ -26,13 +26,13 @@ Do not proceed until the key is confirmed.
 Read sources.json to see if this has been configured before:
 
 ```bash
-cat /Users/allenharper/nanoclaw/.claude/skills/youtube-planner/sources.json 2>/dev/null
+cat /Users/allenharper/bastionclaw/.claude/skills/youtube-planner/sources.json 2>/dev/null
 ```
 
-Also check if a cron task is already scheduled in NanoClaw:
+Also check if a cron task is already scheduled in BastionClaw:
 
 ```bash
-sqlite3 /Users/allenharper/nanoclaw/store/messages.db "SELECT id, schedule_value, status FROM scheduled_tasks WHERE id LIKE 'refresh-insights%' AND schedule_type = 'cron'"
+sqlite3 /Users/allenharper/bastionclaw/store/messages.db "SELECT id, schedule_value, status FROM scheduled_tasks WHERE id LIKE 'refresh-insights%' AND schedule_type = 'cron'"
 ```
 
 ### If sources.json EXISTS AND has lookback_days AND cron task exists (subsequent run):
@@ -90,7 +90,7 @@ When saving sources.json, use this format:
 
 Check if a refresh-insights cron task already exists:
 ```bash
-sqlite3 /Users/allenharper/nanoclaw/store/messages.db "SELECT id, schedule_value, status FROM scheduled_tasks WHERE id LIKE 'refresh-insights%' AND schedule_type = 'cron'"
+sqlite3 /Users/allenharper/bastionclaw/store/messages.db "SELECT id, schedule_value, status FROM scheduled_tasks WHERE id LIKE 'refresh-insights%' AND schedule_type = 'cron'"
 ```
 
 If already exists, show the current schedule and ask if they want to keep it or change it.
@@ -102,12 +102,12 @@ If not installed, ask: "How frequently should this pipeline run automatically?" 
 - **Skip** (no cron, manual only)
 - **Custom** (user provides cron expression)
 
-Note: NanoClaw's task scheduler interprets cron expressions in local timezone (auto-adjusts for DST).
+Note: BastionClaw's task scheduler interprets cron expressions in local timezone (auto-adjusts for DST).
 
-Install as a NanoClaw scheduled task (the agent has access to the nanoclaw project root at `/workspace/project/`):
+Install as a BastionClaw scheduled task (the agent has access to the bastionclaw project root at `/workspace/project/`):
 
 ```bash
-sqlite3 /Users/allenharper/nanoclaw/store/messages.db "INSERT OR REPLACE INTO scheduled_tasks (id, group_folder, chat_jid, prompt, schedule_type, schedule_value, next_run, status, created_at, context_mode) VALUES (
+sqlite3 /Users/allenharper/bastionclaw/store/messages.db "INSERT OR REPLACE INTO scheduled_tasks (id, group_folder, chat_jid, prompt, schedule_type, schedule_value, next_run, status, created_at, context_mode) VALUES (
   'refresh-insights-cron',
   'main',
   'tg:6246700152',
@@ -137,7 +137,7 @@ Replace `SELECTED_CRON` with the user's chosen cron expression (e.g. `0 0,12 * *
 
 Verify:
 ```bash
-sqlite3 /Users/allenharper/nanoclaw/store/messages.db "SELECT id, schedule_value, status FROM scheduled_tasks WHERE id = 'refresh-insights-cron'"
+sqlite3 /Users/allenharper/bastionclaw/store/messages.db "SELECT id, schedule_value, status FROM scheduled_tasks WHERE id = 'refresh-insights-cron'"
 ```
 
 ## Step 4: Run Pipeline Immediately
@@ -145,7 +145,7 @@ sqlite3 /Users/allenharper/nanoclaw/store/messages.db "SELECT id, schedule_value
 Run the pipeline with env vars from .env:
 
 ```bash
-export $(grep -v '^#' /Users/allenharper/nanoclaw/.env | xargs) && python3 /Users/allenharper/nanoclaw/scripts/refresh-insights.py
+export $(grep -v '^#' /Users/allenharper/bastionclaw/.env | xargs) && python3 /Users/allenharper/bastionclaw/scripts/refresh-insights.py
 ```
 
 Stream output to the user. This may take a while depending on the number of channels and lookback period.

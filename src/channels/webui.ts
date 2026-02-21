@@ -5,7 +5,7 @@ import { storeChatMessage } from '../db.js';
 const WEB_CHAT_JID = 'web@chat';
 
 /**
- * WebUI channel — treats the browser WebSocket chat as a standard NanoClaw
+ * WebUI channel — treats the browser WebSocket chat as a standard BastionClaw
  * channel, just like Telegram or WhatsApp. Messages flow through the same
  * processGroupMessages → runAgent → IPC send_message path.
  */

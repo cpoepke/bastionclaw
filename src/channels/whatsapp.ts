@@ -62,7 +62,7 @@ export class WhatsAppChannel implements Channel {
       },
       printQRInTerminal: false,
       logger,
-      browser: ['NanoClaw', 'Chrome', '1.0.0'],
+      browser: ['BastionClaw', 'Chrome', '1.0.0'],
     });
 
     this.sock.ev.on('connection.update', (update) => {
@@ -73,7 +73,7 @@ export class WhatsAppChannel implements Channel {
           'WhatsApp authentication required. Run /setup in Claude Code.';
         logger.error(msg);
         exec(
-          `osascript -e 'display notification "${msg}" with title "NanoClaw" sound name "Basso"'`,
+          `osascript -e 'display notification "${msg}" with title "BastionClaw" sound name "Basso"'`,
         );
         setTimeout(() => process.exit(1), 1000);
       }

@@ -1,5 +1,5 @@
 #!/bin/bash
-# NanoClaw Hard Shell — Clean restart
+# BastionClaw Hard Shell — Clean restart
 # Stops all orphaned containers, kills stale processes, rebuilds, and restarts the service.
 #
 # Usage:
@@ -35,35 +35,35 @@ else
   SERVICE_MGR="none"
 fi
 
-echo "=== NanoClaw Clean Restart ==="
+echo "=== BastionClaw Clean Restart ==="
 echo "  Runtime: ${RUNTIME:-none detected}"
 echo "  Service: ${SERVICE_MGR}"
 
 # 1. Stop the service
 echo "[1/6] Stopping service..."
 if [ "$SERVICE_MGR" = "launchd" ]; then
-  launchctl bootout gui/$(id -u)/com.nanoclaw 2>/dev/null || true
+  launchctl bootout gui/$(id -u)/com.bastionclaw 2>/dev/null || true
 elif [ "$SERVICE_MGR" = "systemd" ]; then
-  systemctl --user stop nanoclaw 2>/dev/null || true
+  systemctl --user stop bastionclaw 2>/dev/null || true
 fi
 sleep 1
 
-# 2. Kill any orphaned nanoclaw Node processes
+# 2. Kill any orphaned bastionclaw Node processes
 echo "[2/6] Killing orphaned processes..."
 pkill -f "node.*dist/index.js" 2>/dev/null || true
-pkill -f "node.*nanoclaw" 2>/dev/null || true
+pkill -f "node.*bastionclaw" 2>/dev/null || true
 
 # 3. Free port 3100 (WebUI)
 echo "[3/6] Freeing port 3100..."
 lsof -ti :3100 2>/dev/null | xargs kill -9 2>/dev/null || true
 
-# 4. Stop all nanoclaw containers (with timeout to avoid hangs)
+# 4. Stop all bastionclaw containers (with timeout to avoid hangs)
 echo "[4/6] Stopping orphaned containers..."
 if [ -n "$RUNTIME" ]; then
   if [ "$RUNTIME" = "container" ]; then
-    NANOCLAW_CONTAINERS=$(container ls --format json 2>/dev/null \
-      | python3 -c "import sys,json; cs=json.load(sys.stdin); print('\n'.join(c['configuration']['id'] for c in cs if c['configuration']['id'].startswith('nanoclaw-')))" 2>/dev/null || true)
-    for c in $NANOCLAW_CONTAINERS; do
+    BASTIONCLAW_CONTAINERS=$(container ls --format json 2>/dev/null \
+      | python3 -c "import sys,json; cs=json.load(sys.stdin); print('\n'.join(c['configuration']['id'] for c in cs if c['configuration']['id'].startswith('bastionclaw-')))" 2>/dev/null || true)
+    for c in $BASTIONCLAW_CONTAINERS; do
       echo "  Stopping: $c (timeout 10s)..."
       # `container stop` hangs on stuck containers — use timeout + force kill
       timeout 10 container stop "$c" 2>/dev/null || {
@@ -75,7 +75,7 @@ if [ -n "$RUNTIME" ]; then
       }
     done
   else
-    for c in $(docker ps -a --format '{{.Names}}' --filter "name=nanoclaw-" 2>/dev/null || true); do
+    for c in $(docker ps -a --format '{{.Names}}' --filter "name=bastionclaw-" 2>/dev/null || true); do
       echo "  Stopping: $c"
       docker stop -t 5 "$c" 2>/dev/null || true
       docker rm -f "$c" 2>/dev/null || true
@@ -111,10 +111,10 @@ if [ "$BUILD" = true ]; then
 
   if [ "$RUNTIME" = "container" ]; then
     echo "  Verifying container..."
-    container run --rm --entrypoint ls nanoclaw-agent:latest /app/src/
+    container run --rm --entrypoint ls bastionclaw-agent:latest /app/src/
   elif [ "$RUNTIME" = "docker" ]; then
     echo "  Verifying container..."
-    docker run --rm --entrypoint ls nanoclaw-agent:latest /app/src/
+    docker run --rm --entrypoint ls bastionclaw-agent:latest /app/src/
   fi
 else
   echo "[5/6] Skipping build (use --build to rebuild)"
@@ -131,34 +131,34 @@ fi
 # 6. Start the service
 echo "[6/6] Starting service..."
 if [ "$SERVICE_MGR" = "launchd" ]; then
-  launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.nanoclaw.plist 2>/dev/null || true
-  launchctl kickstart gui/$(id -u)/com.nanoclaw 2>/dev/null || true
+  launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.bastionclaw.plist 2>/dev/null || true
+  launchctl kickstart gui/$(id -u)/com.bastionclaw 2>/dev/null || true
   sleep 2
 
   # Verify
-  PID=$(launchctl list | grep com.nanoclaw | awk '{print $1}')
+  PID=$(launchctl list | grep com.bastionclaw | awk '{print $1}')
   if [ "$PID" != "-" ] && [ -n "$PID" ]; then
     echo ""
-    echo "=== NanoClaw running (PID: $PID) ==="
-    echo "Logs: tail -f logs/nanoclaw.log"
+    echo "=== BastionClaw running (PID: $PID) ==="
+    echo "Logs: tail -f logs/bastionclaw.log"
   else
     echo ""
     echo "=== WARNING: Service may not have started ==="
-    echo "Check: launchctl list | grep nanoclaw"
-    echo "Logs:  cat logs/nanoclaw.error.log"
+    echo "Check: launchctl list | grep bastionclaw"
+    echo "Logs:  cat logs/bastionclaw.error.log"
   fi
 elif [ "$SERVICE_MGR" = "systemd" ]; then
-  systemctl --user start nanoclaw 2>/dev/null || true
+  systemctl --user start bastionclaw 2>/dev/null || true
   sleep 2
 
-  if systemctl --user is-active nanoclaw &>/dev/null; then
+  if systemctl --user is-active bastionclaw &>/dev/null; then
     echo ""
-    echo "=== NanoClaw running ==="
-    echo "Logs: journalctl --user -u nanoclaw -f"
+    echo "=== BastionClaw running ==="
+    echo "Logs: journalctl --user -u bastionclaw -f"
   else
     echo ""
     echo "=== WARNING: Service may not have started ==="
-    echo "Check: systemctl --user status nanoclaw"
+    echo "Check: systemctl --user status bastionclaw"
   fi
 else
   echo ""

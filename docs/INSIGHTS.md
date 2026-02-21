@@ -1,6 +1,6 @@
 # Insight Tracking System
 
-![NanoClaw Hard Shell](nanoclaw-hard-shell-logo.png)
+![BastionClaw](../assets/bastionclaw-logo.png)
 
 Collect, deduplicate, and rank insights extracted from content sources. The agent extracts generalizable principles from articles, YouTube videos, PDFs, and podcasts. When the same principle appears across multiple independent sources, it rises to the top — surfacing the most robust, widely-observed ideas.
 
@@ -105,7 +105,7 @@ Each link carries its own `context` and `timestamp_ref`, so the same abstract in
 
 ## IPC Protocol
 
-The container agent communicates with the host via JSON files. This is the same IPC mechanism used by all NanoClaw tools.
+The container agent communicates with the host via JSON files. This is the same IPC mechanism used by all BastionClaw tools.
 
 ### Request Flow
 

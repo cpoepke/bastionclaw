@@ -1,7 +1,7 @@
 import { html, nothing } from 'lit';
-import type { NanoClawApp } from '../app.ts';
+import type { BastionClawApp } from '../app.ts';
 
-export function renderMessages(state: NanoClawApp) {
+export function renderMessages(state: BastionClawApp) {
   const groups = state.groups;
 
   return html`

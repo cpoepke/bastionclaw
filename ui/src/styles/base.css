@@ -32,7 +32,7 @@
   --input: #27272a;
   --ring: #14b8a6;
 
-  /* Accent - Teal for NanoClaw */
+  /* Accent - Teal for BastionClaw */
   --accent: #14b8a6;
   --accent-hover: #2dd4bf;
   --accent-muted: #14b8a6;
@@ -108,7 +108,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-nanoclaw-app {
+bastionclaw-app {
   display: block;
   position: relative;
   z-index: 1;

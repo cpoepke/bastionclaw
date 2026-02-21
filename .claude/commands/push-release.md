@@ -170,8 +170,8 @@ This release includes [N] commits:
 ### For New Users
 
 \`\`\`bash
-git clone https://github.com/harperaa/nanoclaw-hard-shell.git
-cd nanoclaw-hard-shell
+git clone https://github.com/harperaa/bastionclaw.git
+cd bastionclaw-hard-shell
 npm install
 \`\`\`
 
@@ -331,7 +331,7 @@ Create the GitHub release with the generated changelog:
 
 ```bash
 gh release create 2026.02.18 \
-  --repo harperaa/nanoclaw-hard-shell \
+  --repo harperaa/bastionclaw \
   --title "2026.02.18: [Release Title]" \
   --notes "[Full changelog in proper markdown format]"
 ```
@@ -344,7 +344,7 @@ gh release create 2026.02.18 \
 
 **Show confirmation with URL:**
 ```
-✅ Created GitHub release: https://github.com/harperaa/nanoclaw-hard-shell/releases/tag/2026.02.18
+✅ Created GitHub release: https://github.com/harperaa/bastionclaw/releases/tag/2026.02.18
 ```
 
 ---
@@ -364,7 +364,7 @@ Tag: Created and pushed
 Release: Published on GitHub
 
 📦 Release URL:
-https://github.com/harperaa/nanoclaw-hard-shell/releases/tag/2026.02.18
+https://github.com/harperaa/bastionclaw/releases/tag/2026.02.18
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
@@ -392,13 +392,13 @@ The tag was created locally and pushed to GitHub.
 However, the GitHub release creation failed.
 
 You can create it manually:
-1. Visit: https://github.com/harperaa/nanoclaw-hard-shell/releases/new
+1. Visit: https://github.com/harperaa/bastionclaw/releases/new
 2. Select tag: 2026.02.18
 3. Copy the changelog from above
 4. Publish the release
 
 Or try again:
-gh release create 2026.02.18 --repo harperaa/nanoclaw-hard-shell --title "2026.02.18: [Title]" --notes "[Changelog]"
+gh release create 2026.02.18 --repo harperaa/bastionclaw --title "2026.02.18: [Title]" --notes "[Changelog]"
 ```
 
 ### If No GitHub CLI Installed
@@ -415,10 +415,10 @@ Option 1: Install GitHub CLI
   # or visit: https://cli.github.com
 
 Then run:
-  gh release create 2026.02.18 --repo harperaa/nanoclaw-hard-shell --title "2026.02.18: [Title]" --notes "[Changelog]"
+  gh release create 2026.02.18 --repo harperaa/bastionclaw --title "2026.02.18: [Title]" --notes "[Changelog]"
 
 Option 2: Create release manually
-  Visit: https://github.com/harperaa/nanoclaw-hard-shell/releases/new
+  Visit: https://github.com/harperaa/bastionclaw/releases/new
   Select tag: 2026.02.18
   Add the changelog and publish
 ```

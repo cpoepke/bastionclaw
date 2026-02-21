@@ -1,6 +1,6 @@
 import { html, nothing } from 'lit';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
-import type { NanoClawApp } from '../app.ts';
+import type { BastionClawApp } from '../app.ts';
 import { formatAgo } from '../format.ts';
 import type { YouTubeVideoData } from '../types.ts';
 
@@ -33,7 +33,7 @@ function formatDuration(seconds: number | null): string {
   return `${m}m ${s}s`;
 }
 
-function sortedVideos(state: NanoClawApp): YouTubeVideoData[] {
+function sortedVideos(state: BastionClawApp): YouTubeVideoData[] {
   const videos = state.youtubeDashboard?.videos || [];
   const col = state.youtubeSortBy;
   const desc = state.youtubeSortDesc;
@@ -53,12 +53,12 @@ function sortedVideos(state: NanoClawApp): YouTubeVideoData[] {
   });
 }
 
-function sortIndicator(state: NanoClawApp, col: string): string {
+function sortIndicator(state: BastionClawApp, col: string): string {
   if (state.youtubeSortBy !== col) return '';
   return state.youtubeSortDesc ? ' \u2193' : ' \u2191';
 }
 
-export function renderYouTube(state: NanoClawApp) {
+export function renderYouTube(state: BastionClawApp) {
   const dashboard = state.youtubeDashboard;
   const sources = state.youtubeSources;
   const videos = sortedVideos(state);

@@ -1,6 +1,6 @@
 import { config } from "dotenv";
 import { writeFileSync } from "fs";
-import { join, dirname } from "path";
+import { join, dirname, extname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -111,6 +111,14 @@ for (let i = 0; i < args.length; i++) {
 // Defaults
 prompt = prompt || "A professional blog header image, modern tech aesthetic";
 outputPath = outputPath || join(projectRoot, "output.png");
+
+// Auto-append timestamp to prevent overwriting previous versions
+// "docs/foo.png" → "docs/foo-20260221-1430.png"
+const now = new Date();
+const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+const ext = extname(outputPath);
+const base = outputPath.slice(0, -ext.length);
+outputPath = `${base}-${ts}${ext}`;
 
 console.log(`Generating image for: "${prompt}"`);
 if (aspectRatio) {

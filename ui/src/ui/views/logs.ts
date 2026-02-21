@@ -1,5 +1,5 @@
 import { html, nothing } from 'lit';
-import type { NanoClawApp } from '../app.ts';
+import type { BastionClawApp } from '../app.ts';
 import type { LogLevel } from '../types.ts';
 
 const LEVELS: LogLevel[] = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'];
@@ -9,7 +9,7 @@ function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString();
 }
 
-export function renderLogs(state: NanoClawApp) {
+export function renderLogs(state: BastionClawApp) {
   const needle = state.logsFilterText.trim().toLowerCase();
   const filtered = state.logs.filter(entry => {
     if (needle && !entry.msg.toLowerCase().includes(needle)) return false;

@@ -11,8 +11,8 @@ import type {
   YouTubeDashboardData, YouTubeSourcesData,
 } from './types.ts';
 
-@customElement('nanoclaw-app')
-export class NanoClawApp extends LitElement {
+@customElement('bastionclaw-app')
+export class BastionClawApp extends LitElement {
   // Disable shadow DOM so global CSS works
   createRenderRoot() { return this; }
 

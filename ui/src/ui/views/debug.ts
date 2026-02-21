@@ -1,8 +1,8 @@
 import { html, nothing } from 'lit';
-import type { NanoClawApp } from '../app.ts';
+import type { BastionClawApp } from '../app.ts';
 import { formatBytes, formatUptime } from '../format.ts';
 
-export function renderDebug(state: NanoClawApp) {
+export function renderDebug(state: BastionClawApp) {
   const d = state.debug;
   if (!d) return html`<div class="muted">Loading...</div>`;
 

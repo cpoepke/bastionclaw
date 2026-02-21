@@ -1,10 +1,10 @@
 import { html, nothing } from 'lit';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
-import type { NanoClawApp } from '../app.ts';
+import type { BastionClawApp } from '../app.ts';
 import { toSanitizedMarkdownHtml } from '../markdown.ts';
 import { clampText } from '../format.ts';
 
-export function renderSkills(state: NanoClawApp) {
+export function renderSkills(state: BastionClawApp) {
   const filter = state.skillsFilter.trim().toLowerCase();
   const filtered = filter
     ? state.skills.filter(s => [s.name, s.description].join(' ').toLowerCase().includes(filter))

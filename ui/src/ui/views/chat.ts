@@ -1,9 +1,9 @@
 import { html, nothing } from 'lit';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
-import type { NanoClawApp } from '../app.ts';
+import type { BastionClawApp } from '../app.ts';
 import { toSanitizedMarkdownHtml } from '../markdown.ts';
 
-export function renderChat(state: NanoClawApp) {
+export function renderChat(state: BastionClawApp) {
   const allMessages = state.chatMessages;
 
   return html`

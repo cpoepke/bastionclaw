@@ -329,7 +329,7 @@ async function startMessageLoop(): Promise<void> {
   }
   messageLoopRunning = true;
 
-  logger.info(`NanoClaw running (trigger: @${ASSISTANT_NAME})`);
+  logger.info(`BastionClaw running (trigger: @${ASSISTANT_NAME})`);
 
   while (true) {
     try {
@@ -450,7 +450,7 @@ function ensureContainerSystemRunning(): void {
         console.error('║  Agents cannot run without Apple Container. To fix:           ║');
         console.error('║  1. Install from: https://github.com/apple/container/releases ║');
         console.error('║  2. Run: container system start                               ║');
-        console.error('║  3. Restart NanoClaw                                          ║');
+        console.error('║  3. Restart BastionClaw                                          ║');
         console.error('╚════════════════════════════════════════════════════════════════╝\n');
         throw new Error('Apple Container system is required but failed to start');
       }
@@ -474,7 +474,7 @@ function ensureContainerSystemRunning(): void {
     }
   }
 
-  // Kill and clean up orphaned NanoClaw containers from previous runs
+  // Kill and clean up orphaned BastionClaw containers from previous runs
   try {
     if (runtime === 'container') {
       const output = execSync('container ls --format json', {
@@ -483,7 +483,7 @@ function ensureContainerSystemRunning(): void {
       });
       const containers: { status: string; configuration: { id: string } }[] = JSON.parse(output || '[]');
       const orphans = containers
-        .filter((c) => c.status === 'running' && c.configuration.id.startsWith('nanoclaw-'))
+        .filter((c) => c.status === 'running' && c.configuration.id.startsWith('bastionclaw-'))
         .map((c) => c.configuration.id);
       for (const name of orphans) {
         try {
@@ -499,7 +499,7 @@ function ensureContainerSystemRunning(): void {
         logger.info({ count: orphans.length, names: orphans }, 'Stopped orphaned containers');
       }
     } else {
-      const output = execSync('docker ps --format "{{.Names}}" --filter "name=nanoclaw-"', {
+      const output = execSync('docker ps --format "{{.Names}}" --filter "name=bastionclaw-"', {
         stdio: ['pipe', 'pipe', 'pipe'],
         encoding: 'utf-8',
       });
@@ -620,7 +620,7 @@ const isDirectRun =
 
 if (isDirectRun) {
   main().catch((err) => {
-    logger.error({ err }, 'Failed to start NanoClaw');
+    logger.error({ err }, 'Failed to start BastionClaw');
     process.exit(1);
   });
 }

@@ -1,8 +1,8 @@
 import { html, nothing } from 'lit';
-import type { NanoClawApp } from '../app.ts';
+import type { BastionClawApp } from '../app.ts';
 import { formatAgo, formatDurationMs, clampText } from '../format.ts';
 
-export function renderTasks(state: NanoClawApp) {
+export function renderTasks(state: BastionClawApp) {
   const tasks = state.tasks;
 
   return html`

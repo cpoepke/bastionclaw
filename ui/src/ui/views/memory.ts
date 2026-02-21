@@ -1,7 +1,7 @@
 import { html, nothing } from 'lit';
-import type { NanoClawApp } from '../app.ts';
+import type { BastionClawApp } from '../app.ts';
 
-export function renderMemory(state: NanoClawApp) {
+export function renderMemory(state: BastionClawApp) {
   const m = state.memory;
   if (!m) return html`<div class="muted">Loading...</div>`;
 

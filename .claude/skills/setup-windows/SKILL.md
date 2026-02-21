@@ -1,12 +1,12 @@
 ---
 name: setup-windows
-description: Set up NanoClaw on Windows via WSL2 + Docker (or Podman). Use when the user wants to run NanoClaw on Windows, set up WSL2, configure Docker on Windows, or get NanoClaw working on a Windows machine. Triggers on "windows", "wsl", "wsl2", "setup windows", "windows setup".
+description: Set up BastionClaw on Windows via WSL2 + Docker (or Podman). Use when the user wants to run BastionClaw on Windows, set up WSL2, configure Docker on Windows, or get BastionClaw working on a Windows machine. Triggers on "windows", "wsl", "wsl2", "setup windows", "windows setup".
 disable-model-invocation: true
 ---
 
 # Setup Windows (WSL2 + Docker/Podman)
 
-This skill sets up NanoClaw on Windows using WSL2 with Docker Desktop or Podman as the container runtime. NanoClaw runs entirely inside WSL2 — Windows is only the host OS.
+This skill sets up BastionClaw on Windows using WSL2 with Docker Desktop or Podman as the container runtime. BastionClaw runs entirely inside WSL2 — Windows is only the host OS.
 
 **What this does:**
 - Validates WSL2 environment (not WSL1)
@@ -17,7 +17,7 @@ This skill sets up NanoClaw on Windows using WSL2 with Docker Desktop or Podman 
 - Configures systemd user service for persistence
 - Runs 5 validation batteries
 
-**Important:** All NanoClaw files must live on the WSL2 native filesystem (`~/`), never on `/mnt/c/`. The Windows mounted filesystem has poor I/O performance and unreliable POSIX semantics that break SQLite and file locking.
+**Important:** All BastionClaw files must live on the WSL2 native filesystem (`~/`), never on `/mnt/c/`. The Windows mounted filesystem has poor I/O performance and unreliable POSIX semantics that break SQLite and file locking.
 
 ## 0. Detect Environment
 
@@ -60,10 +60,10 @@ If not inside WSL2, tell the user:
 > ```
 > wsl --install Ubuntu-24.04
 > ```
-> Then open the Ubuntu terminal and clone NanoClaw there:
+> Then open the Ubuntu terminal and clone BastionClaw there:
 > ```bash
-> git clone https://github.com/harperaa/nanoclaw-hard-shell.git ~/nanoclaw
-> cd ~/nanoclaw
+> git clone https://github.com/harperaa/bastionclaw.git ~/bastionclaw
+> cd ~/bastionclaw
 > claude
 > ```
 > Then run `/setup-windows` again.
@@ -145,7 +145,7 @@ sudo apt-get update -y
 sudo apt-get install -y podman
 ```
 
-Configure `docker` alias for compatibility with NanoClaw's container-runner:
+Configure `docker` alias for compatibility with BastionClaw's container-runner:
 
 ```bash
 # Only if 'docker' command doesn't already exist
@@ -172,15 +172,15 @@ docker run --rm hello-world  # Should work via alias
 
 **Security note on Podman rootless:** Podman runs without a root daemon. Containers run as your user, which means no Docker socket exposure risk. This is the more secure option. However, some Docker images that require root inside the container may need `--userns=keep-id` adjustments.
 
-## 4. Clone and Set Up NanoClaw
+## 4. Clone and Set Up BastionClaw
 
-If NanoClaw is not already cloned inside WSL2:
+If BastionClaw is not already cloned inside WSL2:
 
 ```bash
 # MUST be on WSL2 native filesystem, NOT /mnt/c/
 cd ~
-git clone https://github.com/harperaa/nanoclaw-hard-shell.git ~/nanoclaw
-cd ~/nanoclaw
+git clone https://github.com/harperaa/bastionclaw.git ~/bastionclaw
+cd ~/bastionclaw
 ```
 
 **Critical:** If the project is on `/mnt/c/` (Windows filesystem), move it:
@@ -188,9 +188,9 @@ cd ~/nanoclaw
 ```bash
 if [[ "$(pwd)" == /mnt/* ]]; then
   echo "WARNING: Project is on Windows filesystem. Moving to WSL2 native filesystem..."
-  cp -r "$(pwd)" ~/nanoclaw
-  cd ~/nanoclaw
-  echo "Project moved to ~/nanoclaw"
+  cp -r "$(pwd)" ~/bastionclaw
+  cd ~/bastionclaw
+  echo "Project moved to ~/bastionclaw"
 fi
 ```
 
@@ -202,7 +202,7 @@ npm install
 
 ## 5. Apply Docker Conversion
 
-NanoClaw uses Apple Container by default (macOS-only). Run the `/convert-to-docker` skill to switch to Docker:
+BastionClaw uses Apple Container by default (macOS-only). Run the `/convert-to-docker` skill to switch to Docker:
 
 ```bash
 # This is handled by the existing /convert-to-docker skill
@@ -228,7 +228,7 @@ npm run build
 Verify the image:
 
 ```bash
-docker images | grep nanoclaw-agent
+docker images | grep bastionclaw-agent
 ```
 
 ## 6. WSL2-Specific Adaptations
@@ -248,35 +248,35 @@ const HOME_DIR = process.env.HOME || require('os').homedir();
 ### 6b. Ensure data directories exist
 
 ```bash
-mkdir -p ~/nanoclaw/data/{sessions,ipc,env}
-mkdir -p ~/nanoclaw/groups/main/logs
-mkdir -p ~/nanoclaw/store/auth
+mkdir -p ~/bastionclaw/data/{sessions,ipc,env}
+mkdir -p ~/bastionclaw/groups/main/logs
+mkdir -p ~/bastionclaw/store/auth
 ```
 
 ### 6c. Set file permissions for sensitive data
 
 ```bash
-chmod 700 ~/nanoclaw/store/auth
-chmod 600 ~/nanoclaw/.env 2>/dev/null || true
-chmod 700 ~/nanoclaw/data
+chmod 700 ~/bastionclaw/store/auth
+chmod 600 ~/bastionclaw/.env 2>/dev/null || true
+chmod 700 ~/bastionclaw/data
 ```
 
 ## 7. Configure Persistence (systemd user service)
 
-Create a systemd user service so NanoClaw starts automatically when WSL2 boots:
+Create a systemd user service so BastionClaw starts automatically when WSL2 boots:
 
 ```bash
 mkdir -p ~/.config/systemd/user
 
-cat > ~/.config/systemd/user/nanoclaw.service << 'EOF'
+cat > ~/.config/systemd/user/bastionclaw.service << 'EOF'
 [Unit]
-Description=NanoClaw Hard Shell
+Description=BastionClaw Hard Shell
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/nanoclaw
+WorkingDirectory=%h/bastionclaw
 ExecStart=/bin/bash -lc 'exec node dist/index.js'
 Restart=on-failure
 RestartSec=10
@@ -293,15 +293,15 @@ Enable and start:
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable nanoclaw.service
-systemctl --user start nanoclaw.service
+systemctl --user enable bastionclaw.service
+systemctl --user start bastionclaw.service
 ```
 
 Check status:
 
 ```bash
-systemctl --user status nanoclaw.service
-journalctl --user -u nanoclaw.service --no-pager -n 20
+systemctl --user status bastionclaw.service
+journalctl --user -u bastionclaw.service --no-pager -n 20
 ```
 
 **WSL2 persistence note:** By default, WSL2 shuts down after all terminals close. To keep services running:
@@ -348,46 +348,46 @@ echo "=== Battery 2: Container Isolation ==="
 
 # Test container can run
 echo -n "Container runs: "
-docker run --rm --entrypoint /bin/echo nanoclaw-agent:latest "OK" >/dev/null 2>&1 && echo "PASS" || echo "FAIL"
+docker run --rm --entrypoint /bin/echo bastionclaw-agent:latest "OK" >/dev/null 2>&1 && echo "PASS" || echo "FAIL"
 
 # Test readonly mount
 echo -n "Readonly mount: "
 mkdir -p /tmp/nc-test-ro && echo "test" > /tmp/nc-test-ro/file.txt
-RESULT=$(docker run --rm --entrypoint /bin/bash -v /tmp/nc-test-ro:/test:ro nanoclaw-agent:latest -c "cat /test/file.txt && touch /test/new.txt 2>&1" 2>&1)
+RESULT=$(docker run --rm --entrypoint /bin/bash -v /tmp/nc-test-ro:/test:ro bastionclaw-agent:latest -c "cat /test/file.txt && touch /test/new.txt 2>&1" 2>&1)
 echo "$RESULT" | grep -q "Read-only file system" && echo "PASS" || echo "FAIL"
 rm -rf /tmp/nc-test-ro
 
 # Test read-write mount
 echo -n "Read-write mount: "
 mkdir -p /tmp/nc-test-rw
-docker run --rm --entrypoint /bin/bash -v /tmp/nc-test-rw:/test nanoclaw-agent:latest -c "echo 'write-test' > /test/out.txt"
+docker run --rm --entrypoint /bin/bash -v /tmp/nc-test-rw:/test bastionclaw-agent:latest -c "echo 'write-test' > /test/out.txt"
 [ "$(cat /tmp/nc-test-rw/out.txt 2>/dev/null)" = "write-test" ] && echo "PASS" || echo "FAIL"
 rm -rf /tmp/nc-test-rw
 
 # Test IPC directory works
 echo -n "IPC filesystem: "
 mkdir -p /tmp/nc-test-ipc
-docker run --rm --entrypoint /bin/bash -v /tmp/nc-test-ipc:/workspace/ipc nanoclaw-agent:latest -c "echo '{\"test\":true}' > /workspace/ipc/test.json"
+docker run --rm --entrypoint /bin/bash -v /tmp/nc-test-ipc:/workspace/ipc bastionclaw-agent:latest -c "echo '{\"test\":true}' > /workspace/ipc/test.json"
 [ -f /tmp/nc-test-ipc/test.json ] && echo "PASS" || echo "FAIL"
 rm -rf /tmp/nc-test-ipc
 ```
 
-### Battery 3 — NanoClaw Functional
+### Battery 3 — BastionClaw Functional
 
 ```bash
-echo "=== Battery 3: NanoClaw Functional ==="
+echo "=== Battery 3: BastionClaw Functional ==="
 
 # Build check
 echo -n "TypeScript compiles: "
-cd ~/nanoclaw && npm run build >/dev/null 2>&1 && echo "PASS" || echo "FAIL"
+cd ~/bastionclaw && npm run build >/dev/null 2>&1 && echo "PASS" || echo "FAIL"
 
 # Dist exists
 echo -n "dist/index.js exists: "
-[ -f ~/nanoclaw/dist/index.js ] && echo "PASS" || echo "FAIL"
+[ -f ~/bastionclaw/dist/index.js ] && echo "PASS" || echo "FAIL"
 
 # Container image exists
 echo -n "Container image: "
-docker images | grep -q nanoclaw-agent && echo "PASS" || echo "FAIL"
+docker images | grep -q bastionclaw-agent && echo "PASS" || echo "FAIL"
 
 # SQLite works
 echo -n "SQLite: "
@@ -406,12 +406,12 @@ echo "=== Battery 4: Security ==="
 
 # File permissions
 echo -n "store/auth permissions: "
-PERM=$(stat -c %a ~/nanoclaw/store/auth 2>/dev/null || echo "000")
+PERM=$(stat -c %a ~/bastionclaw/store/auth 2>/dev/null || echo "000")
 [ "$PERM" = "700" ] && echo "PASS ($PERM)" || echo "WARN ($PERM — should be 700)"
 
 echo -n ".env permissions: "
-if [ -f ~/nanoclaw/.env ]; then
-  PERM=$(stat -c %a ~/nanoclaw/.env)
+if [ -f ~/bastionclaw/.env ]; then
+  PERM=$(stat -c %a ~/bastionclaw/.env)
   [ "$PERM" = "600" ] && echo "PASS ($PERM)" || echo "WARN ($PERM — should be 600)"
 else
   echo "SKIP (no .env yet)"
@@ -419,17 +419,17 @@ fi
 
 # Container doesn't have /mnt/c access
 echo -n "No /mnt/c in container: "
-RESULT=$(docker run --rm --entrypoint /bin/ls nanoclaw-agent:latest /mnt/c 2>&1 || true)
+RESULT=$(docker run --rm --entrypoint /bin/ls bastionclaw-agent:latest /mnt/c 2>&1 || true)
 echo "$RESULT" | grep -q "No such file" && echo "PASS" || echo "FAIL (container can see /mnt/c!)"
 
 # Container runs as non-root
 echo -n "Non-root container: "
-CUSER=$(docker run --rm --entrypoint /bin/whoami nanoclaw-agent:latest 2>/dev/null)
+CUSER=$(docker run --rm --entrypoint /bin/whoami bastionclaw-agent:latest 2>/dev/null)
 [ "$CUSER" = "node" ] && echo "PASS (user: $CUSER)" || echo "WARN (user: $CUSER — expected node)"
 
 # Project on native filesystem
 echo -n "Native filesystem: "
-[[ "$(realpath ~/nanoclaw)" != /mnt/* ]] && echo "PASS" || echo "FAIL"
+[[ "$(realpath ~/bastionclaw)" != /mnt/* ]] && echo "PASS" || echo "FAIL"
 ```
 
 ### Battery 5 — Persistence
@@ -438,13 +438,13 @@ echo -n "Native filesystem: "
 echo "=== Battery 5: Persistence ==="
 
 echo -n "systemd service exists: "
-[ -f ~/.config/systemd/user/nanoclaw.service ] && echo "PASS" || echo "FAIL"
+[ -f ~/.config/systemd/user/bastionclaw.service ] && echo "PASS" || echo "FAIL"
 
 echo -n "Service enabled: "
-systemctl --user is-enabled nanoclaw.service >/dev/null 2>&1 && echo "PASS" || echo "FAIL"
+systemctl --user is-enabled bastionclaw.service >/dev/null 2>&1 && echo "PASS" || echo "FAIL"
 
 echo -n "Service running: "
-systemctl --user is-active nanoclaw.service >/dev/null 2>&1 && echo "PASS" || echo "SKIP (start after channel auth)"
+systemctl --user is-active bastionclaw.service >/dev/null 2>&1 && echo "PASS" || echo "SKIP (start after channel auth)"
 
 echo -n "Linger enabled: "
 [ -f /var/lib/systemd/linger/$USER ] && echo "PASS" || echo "WARN (run: loginctl enable-linger $USER)"
@@ -454,7 +454,7 @@ echo -n "Linger enabled: "
 
 Run this final checklist to verify the security model is maintained:
 
-- [ ] NanoClaw runs on WSL2 native filesystem (`~/`), not `/mnt/c/`
+- [ ] BastionClaw runs on WSL2 native filesystem (`~/`), not `/mnt/c/`
 - [ ] Container runtime is Docker or Podman (not running containers as root if Podman)
 - [ ] Containers use the same mount allowlist pattern (only explicit mounts)
 - [ ] `store/auth/` directory has 700 permissions
@@ -480,12 +480,12 @@ systemctl --user restart podman.socket
 **SQLite "module not found" or compilation errors:**
 ```bash
 sudo apt-get install -y build-essential python3 g++
-cd ~/nanoclaw && rm -rf node_modules && npm install
+cd ~/bastionclaw && rm -rf node_modules && npm install
 ```
 
 **Slow filesystem performance:**
 - Move ALL project files to `~/` (WSL2 native ext4)
-- Never use `/mnt/c/` or `/mnt/d/` for NanoClaw data
+- Never use `/mnt/c/` or `/mnt/d/` for BastionClaw data
 - Check with: `df -T .` — should show `ext4`, not `9p`
 
 **WSL2 shuts down and service stops:**
@@ -507,7 +507,7 @@ echo -e "[network]\ngenerateResolvConf = false" | sudo tee /etc/wsl.conf
 
 ## Summary
 
-After completing this skill, NanoClaw is running on Windows via WSL2 with:
+After completing this skill, BastionClaw is running on Windows via WSL2 with:
 - Docker Desktop or Podman as the container runtime
 - All files on WSL2 native filesystem for performance
 - systemd user service for persistence

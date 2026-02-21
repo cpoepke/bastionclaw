@@ -1,6 +1,6 @@
 # YouTube Insight Pipeline
 
-Automated system that monitors YouTube channels, fetches transcripts, extracts actionable insights, deduplicates them, and surfaces everything through the NanoClaw WebUI.
+Automated system that monitors YouTube channels, fetches transcripts, extracts actionable insights, deduplicates them, and surfaces everything through the BastionClaw WebUI.
 
 ## Purpose
 
@@ -67,7 +67,7 @@ Metadata snapshots enable VPH (views per hour) tracking and sparkline trend char
 
 Location: `scripts/bulk-ingest-loop.py`
 
-Feeds transcripts to the NanoClaw container agent one at a time:
+Feeds transcripts to the BastionClaw container agent one at a time:
 - First video starts a container via scheduled task
 - Subsequent videos inject via IPC messages to the running container
 - The agent reads each transcript and calls `add_insight` for 10-15 insights per video
@@ -162,7 +162,7 @@ Real-time dashboard of tracked video performance.
 ## File Layout
 
 ```
-nanoclaw/
+bastionclaw/
   .claude/
     skills/youtube-planner/
       sources.json              Tracked channels + config
@@ -229,7 +229,7 @@ TRANSCRIPT_API_KEY=... python3 scripts/refresh-insights.py
 
 # Or set up cron (the /refresh-insights command does this interactively)
 # Example: every 8 hours
-0 */8 * * * TRANSCRIPT_API_KEY=... ANTHROPIC_API_KEY=... python3 /path/to/nanoclaw/scripts/refresh-insights.py >> /tmp/refresh-insights.log 2>&1
+0 */8 * * * TRANSCRIPT_API_KEY=... ANTHROPIC_API_KEY=... python3 /path/to/bastionclaw/scripts/refresh-insights.py >> /tmp/refresh-insights.log 2>&1
 ```
 
 ### Via slash command
@@ -245,4 +245,4 @@ Walks through source setup, lookback config, cron scheduling, and runs immediate
 | Key | Purpose |
 |-----|---------|
 | `TRANSCRIPT_API_KEY` | TranscriptAPI — fetches YouTube transcripts and channel video lists |
-| `ANTHROPIC_API_KEY` | Container agent — extracts insights from transcripts (should already be configured if NanoClaw is running) |
+| `ANTHROPIC_API_KEY` | Container agent — extracts insights from transcripts (should already be configured if BastionClaw is running) |

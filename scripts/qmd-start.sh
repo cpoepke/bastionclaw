@@ -1,5 +1,5 @@
 #!/bin/bash
-# NanoClaw — qmd memory server startup
+# BastionClaw — qmd memory server startup
 # Registers group collections, embeds new/changed files, starts HTTP MCP daemon.
 
 set -e

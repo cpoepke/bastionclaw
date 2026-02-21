@@ -109,13 +109,13 @@ def clear_sessions():
 
 
 def kill_container():
-    """Force-kill any running nanoclaw container for the main group."""
+    """Force-kill any running bastionclaw container for the main group."""
     try:
         result = subprocess.run(
             ['container', 'list'], capture_output=True, text=True, timeout=10
         )
         for line in result.stdout.strip().split('\n'):
-            if 'nanoclaw-main-' in line:
+            if 'bastionclaw-main-' in line:
                 name = line.split()[0]
                 print(f'  Killing container: {name}')
                 subprocess.run(

@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 DRY_RUN = '--dry-run' in sys.argv
-BASE = Path('/Users/allenharper/nanoclaw/workspace/group/youtube')
+BASE = Path('/Users/allenharper/bastionclaw/workspace/group/youtube')
 
 
 def find_missing():

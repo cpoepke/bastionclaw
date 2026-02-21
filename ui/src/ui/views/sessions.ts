@@ -1,7 +1,7 @@
 import { html } from 'lit';
-import type { NanoClawApp } from '../app.ts';
+import type { BastionClawApp } from '../app.ts';
 
-export function renderSessions(state: NanoClawApp) {
+export function renderSessions(state: BastionClawApp) {
   const sessions = state.sessions;
 
   return html`

@@ -1,5 +1,5 @@
 import { html, nothing } from 'lit';
-import type { NanoClawApp } from '../app.ts';
+import type { BastionClawApp } from '../app.ts';
 import { formatAgo, clampText } from '../format.ts';
 
 /** Build a YouTube deep-link URL from a source URL and timestamp_ref like "12:34" */
@@ -24,7 +24,7 @@ function getAuthor(metadata: string | null): string | null {
   } catch { return null; }
 }
 
-export function renderInsights(state: NanoClawApp) {
+export function renderInsights(state: BastionClawApp) {
   const stats = state.insightStats;
   const insights = state.insights;
   const sources = state.insightSources;

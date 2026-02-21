@@ -82,7 +82,7 @@ youtube-planner --date 2026-02-16
 Run the dashboard generator:
 
 ```bash
-python3 /Users/allenharper/nanoclaw/.claude/skills/youtube-planner/generate-dashboard.py
+python3 /Users/allenharper/bastionclaw/.claude/skills/youtube-planner/generate-dashboard.py
 ```
 
 Output: `workspace/group/youtube/dashboard.html`
@@ -163,19 +163,19 @@ When the user asks to add a new channel (e.g., "add @ChannelHandle to sources"),
 1. **Update sources.json**:
    ```bash
    # Read current sources
-   sources=$(cat /Users/allenharper/nanoclaw/.claude/skills/youtube-planner/sources.json)
+   sources=$(cat /Users/allenharper/bastionclaw/.claude/skills/youtube-planner/sources.json)
    # Add new channel to the list
    # Use Edit tool to add the channel
    ```
 
 2. **Fetch last 30 days of data**:
    ```bash
-   python3 /Users/allenharper/nanoclaw/.claude/skills/youtube-planner/catch-up-channel.py @ChannelHandle
+   python3 /Users/allenharper/bastionclaw/.claude/skills/youtube-planner/catch-up-channel.py @ChannelHandle
    ```
 
 3. **Regenerate dashboard**:
    ```bash
-   python3 /Users/allenharper/nanoclaw/.claude/skills/youtube-planner/generate-dashboard.py
+   python3 /Users/allenharper/bastionclaw/.claude/skills/youtube-planner/generate-dashboard.py
    ```
 
 **Important**: Always use the catch-up script for new channels to bootstrap with 30 days of historical data, even if other channels are in "24-hour mode".

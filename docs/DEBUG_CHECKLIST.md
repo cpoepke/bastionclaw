@@ -1,4 +1,4 @@
-# NanoClaw Debug Checklist
+# BastionClaw Debug Checklist
 
 ## Known Issues (2026-02-08)
 
@@ -15,8 +15,8 @@ Both timers fire at the same time, so containers always exit via hard SIGKILL (c
 
 ```bash
 # 1. Is the service running?
-launchctl list | grep nanoclaw
-# Expected: PID  0  com.nanoclaw (PID = running, "-" = not running, non-zero exit = crashed)
+launchctl list | grep bastionclaw
+# Expected: PID  0  com.bastionclaw (PID = running, "-" = not running, non-zero exit = crashed)
 
 # 2. Detect runtime
 RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
@@ -24,19 +24,19 @@ echo "Runtime: $RUNTIME"
 
 # 3. Any running/orphaned containers?
 if [ "$RUNTIME" = "container" ]; then
-  container ls -a --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
+  container ls -a --format '{{.Names}} {{.Status}}' 2>/dev/null | grep bastionclaw
 else
-  docker ps -a --format '{{.Names}} {{.Status}}' --filter "name=nanoclaw-" 2>/dev/null
+  docker ps -a --format '{{.Names}} {{.Status}}' --filter "name=bastionclaw-" 2>/dev/null
 fi
 
 # 4. Recent errors in service log?
-grep -E 'ERROR|WARN' logs/nanoclaw.log | tail -20
+grep -E 'ERROR|WARN' logs/bastionclaw.log | tail -20
 
 # 5. Is Telegram bot connected? (look for last connection event)
-grep -E 'Telegram bot connected|Telegram bot error|bot.*connected' logs/nanoclaw.log | tail -5
+grep -E 'Telegram bot connected|Telegram bot error|bot.*connected' logs/bastionclaw.log | tail -5
 
 # 6. Are groups loaded?
-grep 'groupCount' logs/nanoclaw.log | tail -3
+grep 'groupCount' logs/bastionclaw.log | tail -3
 ```
 
 ## Session Transcript Branching
@@ -67,7 +67,7 @@ for i, line in enumerate(lines):
 
 ```bash
 # Check for recent timeouts
-grep -E 'Container timeout|timed out' logs/nanoclaw.log | tail -10
+grep -E 'Container timeout|timed out' logs/bastionclaw.log | tail -10
 
 # Check container log files for the timed-out container
 ls -lt groups/*/logs/container-*.log | head -10
@@ -76,23 +76,23 @@ ls -lt groups/*/logs/container-*.log | head -10
 cat groups/<group>/logs/container-<timestamp>.log
 
 # Check if retries were scheduled and what happened
-grep -E 'Scheduling retry|retry|Max retries' logs/nanoclaw.log | tail -10
+grep -E 'Scheduling retry|retry|Max retries' logs/bastionclaw.log | tail -10
 ```
 
 ## Agent Not Responding
 
 ```bash
 # Check if messages are being received from Telegram
-grep -E 'New messages|Telegram message stored' logs/nanoclaw.log | tail -10
+grep -E 'New messages|Telegram message stored' logs/bastionclaw.log | tail -10
 
 # Check if messages are being processed (container spawned)
-grep -E 'Processing messages|Spawning container' logs/nanoclaw.log | tail -10
+grep -E 'Processing messages|Spawning container' logs/bastionclaw.log | tail -10
 
 # Check if messages are being piped to active container
-grep -E 'Piped messages|sendMessage' logs/nanoclaw.log | tail -10
+grep -E 'Piped messages|sendMessage' logs/bastionclaw.log | tail -10
 
 # Check the queue state — any active containers?
-grep -E 'Starting container|Container active|concurrency limit' logs/nanoclaw.log | tail -10
+grep -E 'Starting container|Container active|concurrency limit' logs/bastionclaw.log | tail -10
 
 # Check lastAgentTimestamp vs latest message timestamp
 sqlite3 store/messages.db "SELECT chat_jid, MAX(timestamp) as latest FROM messages GROUP BY chat_jid ORDER BY latest DESC LIMIT 5;"
@@ -102,17 +102,17 @@ sqlite3 store/messages.db "SELECT chat_jid, MAX(timestamp) as latest FROM messag
 
 ```bash
 # Check mount validation logs (shows on container spawn)
-grep -E 'Mount validated|Mount.*REJECTED|mount' logs/nanoclaw.log | tail -10
+grep -E 'Mount validated|Mount.*REJECTED|mount' logs/bastionclaw.log | tail -10
 
 # Verify the mount allowlist is readable
-cat ~/.config/nanoclaw/mount-allowlist.json
+cat ~/.config/bastionclaw/mount-allowlist.json
 
 # Check group's container_config in DB
 sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;"
 
 # Test-run a container to check mounts (dry run)
 RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
-$RUNTIME run --rm --entrypoint ls nanoclaw-agent:latest /workspace/extra/
+$RUNTIME run --rm --entrypoint ls bastionclaw-agent:latest /workspace/extra/
 ```
 
 ## Telegram Bot Issues
@@ -123,7 +123,7 @@ TOKEN=$(grep "^TELEGRAM_BOT_TOKEN=" .env | cut -d= -f2)
 curl -s "https://api.telegram.org/bot${TOKEN}/getMe" | python3 -m json.tool
 
 # Check if bot is polling
-grep -E 'Telegram bot|grammy' logs/nanoclaw.log | tail -10
+grep -E 'Telegram bot|grammy' logs/bastionclaw.log | tail -10
 
 # Check registered Telegram chats
 sqlite3 store/messages.db "SELECT * FROM registered_groups WHERE jid LIKE 'tg:%'"
@@ -143,7 +143,7 @@ ls -t groups/main/logs/container-*.log | head -1 | xargs grep -i "auth\|login\|k
 ./scripts/restart.sh --build
 
 # View live logs
-tail -f logs/nanoclaw.log
+tail -f logs/bastionclaw.log
 ```
 
 **Note:** Always prefer `scripts/restart.sh` over raw launchctl/systemctl commands. Raw service restarts leave orphaned containers running and can cause port conflicts (EADDRINUSE on 3100). The restart script auto-detects Apple Container vs Docker and launchd vs systemd.

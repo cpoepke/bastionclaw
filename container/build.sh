@@ -1,12 +1,12 @@
 #!/bin/bash
-# Build the NanoClaw agent container image
+# Build the BastionClaw agent container image
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-IMAGE_NAME="nanoclaw-agent"
+IMAGE_NAME="bastionclaw-agent"
 TAG="${1:-latest}"
 
 # Auto-detect container runtime
@@ -21,7 +21,7 @@ else
   exit 1
 fi
 
-echo "Building NanoClaw agent container image..."
+echo "Building BastionClaw agent container image..."
 echo "Runtime: ${RUNTIME}"
 echo "Image: ${IMAGE_NAME}:${TAG}"
 

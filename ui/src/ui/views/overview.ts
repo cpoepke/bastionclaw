@@ -1,8 +1,8 @@
 import { html, nothing } from 'lit';
-import type { NanoClawApp } from '../app.ts';
+import type { BastionClawApp } from '../app.ts';
 import { formatUptime } from '../format.ts';
 
-export function renderOverview(state: NanoClawApp) {
+export function renderOverview(state: BastionClawApp) {
   const o = state.overview;
   if (!o) return html`<div class="muted">Loading...</div>`;
 

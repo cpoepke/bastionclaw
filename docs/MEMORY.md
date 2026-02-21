@@ -1,6 +1,6 @@
 # Memory System
 
-NanoClaw uses [qmd](https://github.com/tobi/qmd) for persistent semantic memory — a local hybrid search engine that runs entirely on-device with no cloud dependencies.
+BastionClaw uses [qmd](https://github.com/tobi/qmd) for persistent semantic memory — a local hybrid search engine that runs entirely on-device with no cloud dependencies.
 
 ## Why qmd
 
@@ -36,14 +36,14 @@ We chose IPC files over HTTP MCP because:
 
 - **Works identically on Apple Containers and Docker** — Apple Containers don't support `host.containers.internal`, and qmd binds to localhost only. Docker uses `host.docker.internal`. IPC files avoid all container networking complexity.
 - **No new attack surface** — HTTP would expose a port that any process on the network could reach. File-based IPC is scoped to the mounted volume.
-- **Consistent with existing patterns** — The nanoclaw MCP server already uses stdio + IPC files. Adding a second communication channel would complicate the architecture for no benefit.
+- **Consistent with existing patterns** — The bastionclaw MCP server already uses stdio + IPC files. Adding a second communication channel would complicate the architecture for no benefit.
 - **Acceptable latency** — The host polls IPC every 1 second. Combined with qmd search time (2-5s for hybrid), the ~1s IPC overhead is negligible.
 
 ```
 Host (macOS / Linux)                  Container (Linux VM)
 +-----------------------+             +------------------------+
 |  qmd daemon (:8181)   |             |  Claude Agent SDK      |
-|  - BM25 index         |             |  - nanoclaw MCP        |
+|  - BM25 index         |             |  - bastionclaw MCP        |
 |  - Vector embeddings  |             |    (stdio server)      |
 |  - GGUF models        |             |                        |
 |                       |  IPC files  |  /workspace/ipc/       |
@@ -93,7 +93,7 @@ Only **markdown files** (`*.md`) are indexed. PDFs, PPTX, images, and other form
 
 ## Memory Tools
 
-All memory tools are served by the nanoclaw MCP server (stdio, no networking):
+All memory tools are served by the bastionclaw MCP server (stdio, no networking):
 
 | Tool | qmd Command | Use Case |
 |------|-------------|----------|

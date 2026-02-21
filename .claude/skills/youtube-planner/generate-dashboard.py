@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-WORKSPACE = "/Users/allenharper/nanoclaw/workspace/group/youtube"
+WORKSPACE = "/Users/allenharper/bastionclaw/workspace/group/youtube"
 
 
 def parse_timestamp(filename):

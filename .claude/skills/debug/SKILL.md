@@ -3,7 +3,7 @@ name: debug
 description: Debug container agent issues. Use when things aren't working, container fails, authentication problems, or to understand how the container system works. Covers logs, environment variables, mounts, and common issues.
 ---
 
-# NanoClaw Container Debugging
+# BastionClaw Container Debugging
 
 This guide covers debugging the containerized agent execution system.
 
@@ -30,8 +30,8 @@ src/container-runner.ts               container/agent-runner/
 
 | Log | Location | Content |
 |-----|----------|---------|
-| **Main app logs** | `logs/nanoclaw.log` | Host-side WhatsApp, routing, container spawning |
-| **Main app errors** | `logs/nanoclaw.error.log` | Host-side errors |
+| **Main app logs** | `logs/bastionclaw.log` | Host-side WhatsApp, routing, container spawning |
+| **Main app errors** | `logs/bastionclaw.error.log` | Host-side errors |
 | **Container run logs** | `groups/{folder}/logs/container-*.log` | Per-run: input, mounts, stderr, stdout |
 | **Claude sessions** | `~/.claude/projects/` | Claude Code session history |
 
@@ -90,12 +90,12 @@ To verify secrets are being read correctly, check the container logs for authent
 - **Apple Container:** Only mounts directories, not individual files. Uses `--mount` for readonly, `-v` for read-write.
 - **Docker:** Supports both files and directories. Uses `-v path:path:ro` for readonly.
 
-NanoClaw auto-detects which runtime you're using and applies the correct mount syntax.
+BastionClaw auto-detects which runtime you're using and applies the correct mount syntax.
 
 To check what's mounted inside a container, first detect your runtime:
 ```bash
 RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
-$RUNTIME run --rm --entrypoint /bin/bash nanoclaw-agent:latest -c 'ls -la /workspace/'
+$RUNTIME run --rm --entrypoint /bin/bash bastionclaw-agent:latest -c 'ls -la /workspace/'
 ```
 
 Expected structure:
@@ -118,7 +118,7 @@ Expected structure:
 The container runs as user `node` (uid 1000). Check ownership:
 ```bash
 RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
-$RUNTIME run --rm --entrypoint /bin/bash nanoclaw-agent:latest -c '
+$RUNTIME run --rm --entrypoint /bin/bash bastionclaw-agent:latest -c '
   whoami
   ls -la /workspace/
   ls -la /app/
@@ -144,7 +144,7 @@ grep -A3 "Claude sessions" src/container-runner.ts
 RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
 $RUNTIME run --rm --entrypoint /bin/bash \
   -v ~/.claude:/home/node/.claude \
-  nanoclaw-agent:latest -c '
+  bastionclaw-agent:latest -c '
 echo "HOME=$HOME"
 ls -la $HOME/.claude/projects/ 2>&1 | head -5
 '
@@ -177,12 +177,12 @@ echo '{"prompt":"What is 2+2?","groupFolder":"test","chatJid":"test@g.us","isMai
   $RUNTIME run -i \
   -v $(pwd)/groups/test:/workspace/group \
   -v $(pwd)/data/ipc:/workspace/ipc \
-  nanoclaw-agent:latest
+  bastionclaw-agent:latest
 ```
 
 ### Interactive shell in container:
 ```bash
-$RUNTIME run --rm -it --entrypoint /bin/bash nanoclaw-agent:latest
+$RUNTIME run --rm -it --entrypoint /bin/bash bastionclaw-agent:latest
 ```
 
 ## SDK Options Reference
@@ -223,10 +223,10 @@ cd ui && npm install && npm run build && cd ..  # WebUI frontend
 RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
 
 # List images
-$RUNTIME images | grep nanoclaw
+$RUNTIME images | grep bastionclaw
 
 # Check what's in the image
-$RUNTIME run --rm --entrypoint /bin/bash nanoclaw-agent:latest -c '
+$RUNTIME run --rm --entrypoint /bin/bash bastionclaw-agent:latest -c '
   echo "=== Node version ==="
   node --version
 
@@ -253,13 +253,13 @@ rm -rf data/sessions/
 # Clear sessions for a specific group
 rm -rf data/sessions/{groupFolder}/.claude/
 
-# Also clear the session ID from NanoClaw's tracking (stored in SQLite)
+# Also clear the session ID from BastionClaw's tracking (stored in SQLite)
 sqlite3 store/messages.db "DELETE FROM sessions WHERE group_folder = '{groupFolder}'"
 ```
 
 To verify session resumption is working, check the logs for the same session ID across messages:
 ```bash
-grep "Session initialized" logs/nanoclaw.log | tail -5
+grep "Session initialized" logs/bastionclaw.log | tail -5
 # Should show the SAME session ID for consecutive messages in the same group
 ```
 
@@ -295,7 +295,7 @@ cat data/ipc/{groupFolder}/current_tasks.json
 Run this to check common issues:
 
 ```bash
-echo "=== Checking NanoClaw Container Setup ==="
+echo "=== Checking BastionClaw Container Setup ==="
 
 RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
 echo "Runtime: $RUNTIME"
@@ -311,7 +311,7 @@ else
 fi
 
 echo -e "\n3. Container image exists?"
-$RUNTIME images nanoclaw-agent:latest --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -q nanoclaw && echo "OK" || echo "MISSING - run ./container/build.sh"
+$RUNTIME images bastionclaw-agent:latest --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -q bastionclaw && echo "OK" || echo "MISSING - run ./container/build.sh"
 
 echo -e "\n4. Session mount path correct?"
 grep -q "/home/node/.claude" src/container-runner.ts 2>/dev/null && echo "OK" || echo "WRONG - should mount to /home/node/.claude/, not /root/.claude/"
@@ -326,6 +326,6 @@ echo -e "\n7. Recent container logs?"
 ls -t groups/*/logs/container-*.log 2>/dev/null | head -3 || echo "No container logs yet"
 
 echo -e "\n8. Session continuity working?"
-SESSIONS=$(grep "Session initialized" logs/nanoclaw.log 2>/dev/null | tail -5 | awk '{print $NF}' | sort -u | wc -l)
+SESSIONS=$(grep "Session initialized" logs/bastionclaw.log 2>/dev/null | tail -5 | awk '{print $NF}' | sort -u | wc -l)
 [ "$SESSIONS" -le 2 ] && echo "OK (recent sessions reusing IDs)" || echo "CHECK - multiple different session IDs, may indicate resumption issues"
 ```

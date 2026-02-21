@@ -14,7 +14,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-DB_PATH = Path('/Users/allenharper/nanoclaw/store/messages.db')
+DB_PATH = Path('/Users/allenharper/bastionclaw/store/messages.db')
 
 
 def sanitize(text):
@@ -48,9 +48,9 @@ def main():
         print("Error: TRANSCRIPT_API_KEY not set")
         sys.exit(1)
 
-    # Setup paths (use absolute path to nanoclaw workspace)
-    nanoclaw_root = Path('/Users/allenharper/nanoclaw')
-    base = nanoclaw_root / 'workspace' / 'group' / 'youtube'
+    # Setup paths (use absolute path to bastionclaw workspace)
+    bastionclaw_root = Path('/Users/allenharper/bastionclaw')
+    base = bastionclaw_root / 'workspace' / 'group' / 'youtube'
     base.mkdir(parents=True, exist_ok=True)
 
     # Fetch latest videos from channel

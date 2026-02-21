@@ -1,7 +1,7 @@
 import { html } from 'lit';
-import type { NanoClawApp } from '../app.ts';
+import type { BastionClawApp } from '../app.ts';
 
-export function renderChannels(state: NanoClawApp) {
+export function renderChannels(state: BastionClawApp) {
   if (state.channels.length === 0) {
     return html`<div class="card"><div class="muted">No channels configured.</div></div>`;
   }
