@@ -1,6 +1,6 @@
 # Insight Tracking System
 
-![BastionClaw](../assets/bastionclaw-logo.png)
+<img src="../assets/bastionclaw-logo.png" alt="BastionClaw" width="600">
 
 Collect, deduplicate, and rank insights extracted from content sources. The agent extracts generalizable principles from articles, YouTube videos, PDFs, and podcasts. When the same principle appears across multiple independent sources, it rises to the top — surfacing the most robust, widely-observed ideas.
 
