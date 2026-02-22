@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page {
+    size: letter;
+    margin: 1in 0.85in;
+  }
+  body {
+    font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #1a1a2e;
+    line-height: 1.6;
+    font-size: 11pt;
+  }
+  .cover {
+    text-align: center;
+    padding-top: 2in;
+    page-break-after: always;
+  }
+  .cover img {
+    width: 400px;
+  }
+  .cover h1 {
+    font-size: 28pt;
+    margin-top: 0.5in;
+    color: #1a1a2e;
+  }
+  .cover .subtitle {
+    font-size: 14pt;
+    color: #555;
+    margin-top: 0.3in;
+  }
+  .cover .date {
+    font-size: 11pt;
+    color: #888;
+    margin-top: 1.5in;
+  }
+  h1 {
+    font-size: 20pt;
+    color: #1a1a2e;
+    border-bottom: 2px solid #00d4aa;
+    padding-bottom: 6px;
+    margin-top: 0.4in;
+  }
+  h2 {
+    font-size: 14pt;
+    color: #2a5a8a;
+    margin-top: 0.3in;
+  }
+  .diagram {
+    text-align: center;
+    margin: 0.3in 0;
+  }
+  .diagram img {
+    max-width: 100%;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+  }
+  .diagram .caption {
+    font-size: 9pt;
+    color: #888;
+    margin-top: 6px;
+    font-style: italic;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.2in 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+  th {
+    background: #1a1a2e;
+    color: white;
+    padding: 8px 12px;
+    text-align: left;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #ddd;
+  }
+  tr:nth-child(even) td {
+    background: #f8f9fa;
+  }
+  .highlight-box {
+    background: #f0faf7;
+    border-left: 4px solid #00d4aa;
+    padding: 12px 16px;
+    margin: 0.2in 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .warn-box {
+    background: #fff5f0;
+    border-left: 4px solid #ff6b35;
+    padding: 12px 16px;
+    margin: 0.2in 0;
+    border-radius: 0 6px 6px 0;
+  }
+  ul {
+    margin: 0.1in 0;
+    padding-left: 0.3in;
+  }
+  li {
+    margin-bottom: 4px;
+  }
+  .page-break {
+    page-break-before: always;
+  }
+</style>
+</head>
+<body>
+
+<!-- Cover Page -->
+<div class="cover">
+  <img src="../assets/bastionclaw-logo.png" alt="BastionClaw">
+  <h1>BastionClaw</h1>
+  <div class="subtitle">A Secure, Lightweight Personal AI Assistant<br>
+  Why It Exists, How It Differs from OpenClaw, and What It Improves</div>
+  <div class="date">February 2026</div>
+</div>
+
+<!-- Section 1: The Problem with OpenClaw -->
+<h1>The Problem with OpenClaw</h1>
+
+<p>OpenClaw (formerly ClawBot) is a popular open-source AI assistant framework. Over time it grew into a complex system that became increasingly difficult to understand, secure, and maintain.</p>
+
+<h2>Complexity</h2>
+<ul>
+  <li><strong>52+ modules</strong> across multiple processes and gateways</li>
+  <li><strong>45+ dependencies</strong> with deep transitive chains</li>
+  <li><strong>8 configuration files</strong> just to manage settings</li>
+  <li><strong>15 channel provider abstractions</strong> — most users only need one</li>
+  <li>No single person can realistically understand the entire codebase</li>
+</ul>
+
+<h2>Security Model: Application-Level Trust</h2>
+
+<div class="warn-box">
+  OpenClaw's security relies on application-level constructs: allowlists, pairing codes, and permission checks. All channels share one Node.js process with shared memory. Secrets live in environment variables, accessible to all code. There is no container isolation, no per-group filesystem boundaries, and no resource limits.
+</div>
+
+<p>This means a bug in any module can potentially access data from any channel or group. The trust boundary is the application code itself — and with 52+ modules, that boundary is very wide.</p>
+
+<!-- Section 2: Why NanoClaw Was Created -->
+<h1>Why NanoClaw Was Created</h1>
+
+<p>NanoClaw was built as a lightweight, secure alternative to OpenClaw. The philosophy is simple: deliver the same core functionality in a codebase you can read and understand in minutes, with real OS-level security instead of application-level permission checks.</p>
+
+<div class="highlight-box">
+  <strong>Core principle:</strong> One process. A handful of files. Agents run in actual Linux containers with filesystem isolation — not behind permission checks in shared memory.
+</div>
+
+<h2>Key Design Decisions</h2>
+<ul>
+  <li><strong>Small enough to understand</strong> — The entire codebase can be read in a single sitting</li>
+  <li><strong>Security through true isolation</strong> — OS-level container boundaries, not application-level allowlists</li>
+  <li><strong>Built for one user</strong> — Working software, not a framework</li>
+  <li><strong>Skills over features</strong> — Contributors add skills (transformations), not bloated integrations</li>
+  <li><strong>AI-native development</strong> — Setup, debugging, and customization through Claude Code</li>
+</ul>
+
+<p>All credit for the core architecture, container isolation model, skills system, and agent swarm support goes to the <a href="https://github.com/qwibitai/nanoclaw" style="color: #2a5a8a;">upstream NanoClaw project</a> by <a href="https://github.com/gavrielc" style="color: #2a5a8a;">@gavrielc</a>. NanoClaw is an exceptional piece of engineering — a system that proves you don't need complexity to build something powerful and secure.</p>
+
+<!-- Section 2.5: Why I Forked It -->
+<h1>Why I Forked It</h1>
+
+<p>I needed a personal Claude assistant tailored for cybersecurity work. NanoClaw's container isolation model and small codebase made it the ideal foundation. This fork adds:</p>
+
+<ul>
+  <li><strong>Telegram-first setup</strong> — The official bot API is more reliable than WhatsApp's unofficial library, and better suited for automated workflows</li>
+  <li><strong>Web control panel</strong> — A full browser-based UI for monitoring agent sessions, managing tasks, viewing logs, and chatting directly with the agent without needing a phone</li>
+  <li><strong>Security research tooling</strong> — Custom skills and configurations for penetration testing, threat analysis, and security automation workflows</li>
+</ul>
+
+<p>The upstream project's philosophy of "skills over features" means these customizations stay clean and maintainable. BastionClaw doesn't fight NanoClaw's architecture — it builds on it.</p>
+
+<div class="page-break"></div>
+
+<!-- Section 3: Security Architecture Comparison -->
+<h1>Security Architecture: OpenClaw vs BastionClaw</h1>
+
+<p>The diagram below compares the two security models side by side. On the left, OpenClaw's application-level approach; on the right, BastionClaw's OS-level container isolation.</p>
+
+<div class="diagram">
+  <img src="openclaw-vs-bastionclaw-security-20260221-1945.png" alt="OpenClaw vs BastionClaw Security Architecture">
+  <div class="caption">Figure 1: Security architecture comparison — application-level checks vs. OS-level container isolation</div>
+</div>
+
+<table>
+  <tr>
+    <th>Security Property</th>
+    <th>OpenClaw</th>
+    <th>BastionClaw</th>
+  </tr>
+  <tr>
+    <td>Container isolation</td>
+    <td>None — shared process</td>
+    <td>Each agent runs in a Linux VM</td>
+  </tr>
+  <tr>
+    <td>Secret protection</td>
+    <td>Environment variables (shared)</td>
+    <td>Passed via stdin, deleted after read</td>
+  </tr>
+  <tr>
+    <td>Per-group isolation</td>
+    <td>Application-level checks</td>
+    <td>Separate filesystem mounts per group</td>
+  </tr>
+  <tr>
+    <td>Ephemeral environments</td>
+    <td>Persistent shared state</td>
+    <td>Containers are ephemeral (--rm)</td>
+  </tr>
+  <tr>
+    <td>Resource limits</td>
+    <td>Unrestricted</td>
+    <td>2 CPU / 512MB per container</td>
+  </tr>
+  <tr>
+    <td>Network filtering</td>
+    <td>Unrestricted</td>
+    <td>Unrestricted (both)</td>
+  </tr>
+  <tr>
+    <td>Trust boundary</td>
+    <td>Application code</td>
+    <td>OS / hypervisor</td>
+  </tr>
+</table>
+
+<!-- Section 4: What BastionClaw Adds -->
+<h1>What BastionClaw Improves</h1>
+
+<p>BastionClaw is a fork of NanoClaw, adding features tailored for cybersecurity workflows and daily productivity.</p>
+
+<h2>Telegram-First Communication</h2>
+<p>BastionClaw uses the official Telegram Bot API (via Grammy) as its default channel. The official API is more reliable than WhatsApp's unofficial library and better suited for automated workflows. WhatsApp is still available as an optional add-on.</p>
+
+<h2>Web Control Panel</h2>
+<p>A built-in Fastify + Lit web UI runs on port 3100, providing browser-based access to:</p>
+<ul>
+  <li><strong>Chat</strong> — Talk to the agent directly from a browser</li>
+  <li><strong>Dashboard</strong> — System stats, uptime, queue depth, channel health</li>
+  <li><strong>Operations</strong> — Group management, message history, task scheduling, session control</li>
+  <li><strong>System</strong> — Skills CRUD, per-group CLAUDE.md editor, log viewer, diagnostics</li>
+</ul>
+
+<h2>Semantic Memory</h2>
+<p>Long-term memory powered by qmd with hybrid search (BM25 + vector + LLM reranking). Conversations are progressively indexed mid-session and archived at compaction. The agent naturally recalls past discussions. Runs fully local with GGUF models — no cloud APIs needed.</p>
+
+<h2>Insight Engine</h2>
+<p>A content intelligence system that ingests articles, YouTube videos, PDFs, and podcasts, extracting generalizable insights. Semantic deduplication merges insights across sources — when multiple independent creators express the same idea, the corroboration count rises, surfacing the most widely-observed principles.</p>
+
+<div class="diagram">
+  <img src="data-to-wisdom-pipeline.png" alt="Data to Wisdom Pipeline">
+  <div class="caption">Figure 2: The four-stage insight pipeline — from raw data to actionable wisdom</div>
+</div>
+
+<div class="diagram">
+  <img src="insights-architecture-overview.png" alt="Insight Tracking System Architecture">
+  <div class="caption">Figure 3: Technical architecture of the insight tracking system</div>
+</div>
+
+<h2>Agent Swarms</h2>
+<p>Spin up teams of specialized agents that collaborate on complex tasks. Each subagent gets its own bot identity in Telegram groups, enabling visible multi-agent workflows.</p>
+
+<h2>Cybersecurity Focus</h2>
+<p>Custom skills and configurations tailored for penetration testing, threat analysis, and security automation workflows. The container isolation model makes this particularly safe — agents with bash access are sandboxed at the OS level.</p>
+
+<!-- Section 5: Architecture -->
+<h1>Architecture Overview</h1>
+
+<p>BastionClaw runs as a single Node.js process that orchestrates everything:</p>
+
+<pre style="background: #f4f4f4; padding: 12px; border-radius: 6px; font-size: 9pt; line-height: 1.5;">
+Channels (Telegram/WhatsApp) ──→ SQLite ──→ Polling loop ──→ Container (Claude Agent SDK) ──→ Response
+WebUI (localhost:3100)       ──→ REST API / WebSocket ──────^
+</pre>
+
+<h2>Key Components</h2>
+<table>
+  <tr><th>Component</th><th>Purpose</th></tr>
+  <tr><td>src/index.ts</td><td>Orchestrator: state, message loop, agent invocation</td></tr>
+  <tr><td>src/channels/telegram.ts</td><td>Telegram bot connection via Grammy</td></tr>
+  <tr><td>src/container-runner.ts</td><td>Spawns streaming agent containers</td></tr>
+  <tr><td>src/group-queue.ts</td><td>Per-group queue with global concurrency limit</td></tr>
+  <tr><td>src/task-scheduler.ts</td><td>Scheduled task execution</td></tr>
+  <tr><td>src/db.ts</td><td>SQLite operations (messages, groups, sessions, state)</td></tr>
+  <tr><td>src/webui/server.ts</td><td>Fastify server, API routes, WebSocket handler</td></tr>
+  <tr><td>groups/*/CLAUDE.md</td><td>Per-group isolated memory</td></tr>
+</table>
+
+<h2>Container Runtimes</h2>
+<ul>
+  <li><strong>macOS:</strong> Apple Container (lightweight, optimized for Apple Silicon) or Docker</li>
+  <li><strong>Linux:</strong> Docker (auto-detected)</li>
+  <li><strong>Windows:</strong> Docker or Podman via WSL2</li>
+</ul>
+
+<div class="highlight-box">
+  <strong>Getting started:</strong> Clone the repo, run <code>claude</code>, then <code>/setup</code>. Claude Code handles dependencies, bot creation, container setup, and service configuration automatically.
+</div>
+
+<div style="text-align: center; margin-top: 0.6in; padding-top: 0.3in; border-top: 2px solid #00d4aa;">
+  <p style="font-size: 14pt; color: #1a1a2e; font-weight: bold;">Want to learn more?</p>
+  <p style="font-size: 12pt;">Visit <a href="https://www.allenharper.com" style="color: #2a5a8a; text-decoration: none; font-weight: bold;">www.allenharper.com</a></p>
+</div>
+
+</body>
+</html>
