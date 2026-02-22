@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { writeFileSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 import { join, dirname, extname } from "path";
 import { fileURLToPath } from "url";
 
@@ -21,7 +21,7 @@ async function generateImage(prompt, outputPath, options = {}) {
 
   // Build generation config with optional aspect ratio
   const generationConfig = {
-    responseModalities: ["IMAGE"],
+    responseModalities: options.inputImage ? ["TEXT", "IMAGE"] : ["IMAGE"],
   };
 
   // Add image config if aspect ratio specified
@@ -31,6 +31,18 @@ async function generateImage(prompt, outputPath, options = {}) {
     };
   }
 
+  // Build parts array — text-only for generation, text+image for editing
+  const parts = [{ text: prompt }];
+
+  if (options.inputImage) {
+    const imgBuffer = readFileSync(options.inputImage);
+    const imgExt = extname(options.inputImage).toLowerCase();
+    const mimeMap = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
+    const mimeType = mimeMap[imgExt] || "image/png";
+    parts.push({ inlineData: { mimeType, data: imgBuffer.toString("base64") } });
+    console.log(`Editing image: ${options.inputImage} (${mimeType})`);
+  }
+
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -38,7 +50,7 @@ async function generateImage(prompt, outputPath, options = {}) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
+      contents: [{ parts }],
       generationConfig,
     }),
   });
@@ -80,13 +92,14 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
 Usage: node generate-image.js "prompt" "output-path" [options]
 
 Options:
+  --input, -i          Source image to edit (enables image editing mode)
   --aspect-ratio, -ar  Set aspect ratio (1:1, 16:9, 9:16, 4:3, 3:4, 21:9)
   --help, -h           Show this help message
 
 Examples:
   node generate-image.js "A sunset over mountains" output.png
   node generate-image.js "Blog banner about coding" banner.jpg --aspect-ratio 16:9
-  node generate-image.js "Professional tech header" public/blog/images/header.jpg -ar 16:9
+  node generate-image.js "Change the background to blue" edited.png --input original.png
 `);
   process.exit(0);
 }
@@ -97,10 +110,13 @@ const args = process.argv.slice(2);
 let prompt = "";
 let outputPath = "";
 let aspectRatio = null;
+let inputImage = null;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--aspect-ratio" || args[i] === "-ar") {
     aspectRatio = args[++i];
+  } else if (args[i] === "--input" || args[i] === "-i") {
+    inputImage = args[++i];
   } else if (!prompt) {
     prompt = args[i];
   } else if (!outputPath) {
@@ -120,10 +136,10 @@ const ext = extname(outputPath);
 const base = outputPath.slice(0, -ext.length);
 outputPath = `${base}-${ts}${ext}`;
 
-console.log(`Generating image for: "${prompt}"`);
+console.log(`${inputImage ? "Editing" : "Generating"} image for: "${prompt}"`);
 if (aspectRatio) {
   console.log(`Aspect ratio: ${aspectRatio}`);
 }
 
-generateImage(prompt, outputPath, { aspectRatio }).catch(console.error);
+generateImage(prompt, outputPath, { aspectRatio, inputImage }).catch(console.error);
 

@@ -10,10 +10,28 @@ Generate images using Gemini's image model via `scripts/generate-image.js`. Spec
 ## Usage
 
 ```bash
+# Generate a new image
 node scripts/generate-image.js "<prompt>" "<output-path>" [--aspect-ratio 16:9]
+
+# Edit an existing image
+node scripts/generate-image.js "<edit prompt>" "<output-path>" --input <source-image> [--aspect-ratio 16:9]
 ```
 
 Requires `GEMINI_API_KEY` in `.env`.
+
+## Image Editing
+
+Pass `--input` / `-i` with a path to an existing image to edit it instead of generating from scratch. The prompt should describe only the desired change — Gemini will preserve the rest of the image.
+
+Good edit prompts:
+- "Change the background color to blue"
+- "Add a crown to the lobster"
+- "Remove the text in the bottom right corner"
+- "Make the arrows thicker and brighter"
+
+Bad edit prompts (too vague or re-describe the whole image):
+- "A diagram with boxes and arrows" — this regenerates rather than edits
+- "Make it better" — too vague for targeted edits
 
 ## Aspect Ratios
 
@@ -94,7 +112,7 @@ Keep it minimal and readable. No unnecessary decoration.
 
 ## Output Location
 
-**CRITICAL: Never overwrite existing images.** Always append a timestamp to the filename so previous versions are preserved. Gemini generates a new image from scratch every time — there is no way to edit an existing image, so keeping prior versions is essential.
+**CRITICAL: Never overwrite existing images.** Always append a timestamp to the filename so previous versions are preserved.
 
 **Naming format:** `docs/<name>-<YYYYMMDD-HHMM>.png`
 
@@ -110,6 +128,7 @@ When the user picks a final version to use in docs, symlink or copy it to the cl
 
 ## Process
 
+### Generating a New Image
 1. Understand what the user wants to visualize
 2. Construct the prompt using the style guide above
 3. Choose appropriate aspect ratio (default `16:9` for diagrams)
@@ -117,3 +136,11 @@ When the user picks a final version to use in docs, symlink or copy it to the cl
 5. Run `node scripts/generate-image.js "<prompt>" "<path>" -ar <ratio>`
 6. Read the generated image to verify quality
 7. If the user wants it linked in docs, update the relevant `.md` file
+
+### Editing an Existing Image
+1. Identify the source image to edit (use the most recent timestamped version)
+2. Write a focused prompt describing only the change (not the whole image)
+3. Generate a new output path with timestamp (never overwrite the source)
+4. Run `node scripts/generate-image.js "<edit prompt>" "<path>" --input <source-image>`
+5. Read the edited image to verify the change was applied
+6. If unsatisfied, iterate with a more specific prompt
