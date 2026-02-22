@@ -23,7 +23,7 @@ The authors of [NanoClaw](https://github.com/qwibitai/nanoclaw) built it as a li
 NanoClaw gives you the same core functionality in a codebase you can understand in 8 minutes. One process. A handful of files. Agents run in actual Linux containers with filesystem isolation, not behind permission checks.
 
 <p align="center">
-  <img src="docs/openclaw-vs-nanoclaw-security.png" alt="OpenClaw vs BastionClaw Security Model" width="600">
+  <img src="docs/openclaw-vs-bastionclaw-security-20260221-1945.png" alt="OpenClaw vs BastionClaw Security Model" width="600">
 </p>
 
 ## Why I Forked It
