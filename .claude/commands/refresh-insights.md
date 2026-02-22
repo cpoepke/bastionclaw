@@ -120,7 +120,8 @@ sqlite3 /Users/allenharper/bastionclaw/store/messages.db "INSERT OR REPLACE INTO
 4. Find all new transcript.json files that are not yet indexed in insight_sources. For each one:
    - Check duration: read the transcript JSON, get the last segment start time. If < 120 seconds, SKIP it (it is a Short).
    - Read the metadata and transcript
-   - Extract 10-15 insights using add_insight (pass source_metadata as JSON string with author, published, viewCount, videoId)
+   - You MUST extract at least 10 insights per video (target 10-15). Do NOT reduce this number for efficiency or any other reason. Each insight should be a distinct, actionable takeaway.
+   - Use add_insight for each (pass source_metadata as JSON string with author, published, viewCount, videoId)
    - Do NOT call search_insights or link_insight_source
 5. Run: python3 /workspace/project/scripts/dedup-insights.py
 6. Send a summary via send_message: channels fetched, new transcripts, insights extracted, shorts skipped, dedup merges.',
