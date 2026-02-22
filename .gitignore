@@ -37,5 +37,8 @@ agents-sdk-docs
 # Firecrawl cache
 .firecrawl/
 
+# User-specific config (template checked in, local changes ignored)
+.claude/skills/youtube-planner/sources.json
+
 # Local-only skills
 container/skills/oura/
