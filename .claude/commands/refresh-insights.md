@@ -150,6 +150,33 @@ export $(grep -v '^#' /Users/allenharper/bastionclaw/.env | xargs) && python3 /U
 
 Stream output to the user. This may take a while depending on the number of channels and lookback period.
 
+## Monitoring In-Progress Pipeline (Container Agent)
+
+When the refresh-insights pipeline runs as a scheduled task inside a container, use these commands to check progress:
+
+```bash
+# 1. Is the container running?
+RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
+$RUNTIME list 2>/dev/null || $RUNTIME ps 2>/dev/null
+
+# 2. Check processes inside (look for 'claude' agent)
+$RUNTIME exec bastionclaw-main-{timestamp} ps aux
+
+# 3. Check new sources indexed since pipeline started
+sqlite3 /Users/allenharper/bastionclaw/store/messages.db \
+  "SELECT title, indexed_at FROM insight_sources WHERE indexed_at >= 'START_TIMESTAMP' ORDER BY indexed_at DESC"
+
+# 4. Check new insights extracted since pipeline started
+sqlite3 /Users/allenharper/bastionclaw/store/messages.db \
+  "SELECT substr(text,1,80), category, first_seen FROM insights WHERE first_seen >= 'START_TIMESTAMP' ORDER BY first_seen DESC LIMIT 20"
+
+# 5. Check task run logs after completion
+sqlite3 /Users/allenharper/bastionclaw/store/messages.db \
+  "SELECT run_at, duration_ms, status, substr(result,1,200) FROM task_run_logs WHERE task_id = 'refresh-insights-cron' ORDER BY run_at DESC LIMIT 3"
+```
+
+Replace `{timestamp}` with the container name from step 1, and `START_TIMESTAMP` with the ISO timestamp when the task started (visible in `logs/bastionclaw.log`).
+
 ## Step 5: Show Results
 
 After the pipeline completes:

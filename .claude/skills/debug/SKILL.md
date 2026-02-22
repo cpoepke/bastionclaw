@@ -290,6 +290,57 @@ cat data/ipc/{groupFolder}/current_tasks.json
 - `current_tasks.json` - Host writes: read-only snapshot of scheduled tasks
 - `available_groups.json` - Host writes: read-only list of WhatsApp groups (main only)
 
+## Monitoring Running Container Agents
+
+When an agent is actively running (e.g. during a scheduled task like refresh-insights), use these steps to check progress:
+
+### 1. Verify container is running
+```bash
+RUNTIME=$(command -v container &>/dev/null && echo "container" || echo "docker")
+$RUNTIME list 2>/dev/null || $RUNTIME ps 2>/dev/null
+# Look for containers named bastionclaw-{group}-{timestamp}
+```
+
+### 2. Check processes inside the container
+```bash
+$RUNTIME exec bastionclaw-main-{timestamp} ps aux
+# Key processes: claude (the agent), node /tmp/dist/index.js (runner)
+```
+
+### 3. Check IPC activity from inside the container
+```bash
+# Current task state visible to the agent
+$RUNTIME exec bastionclaw-main-{timestamp} cat /workspace/ipc/current_tasks.json
+
+# Outbound messages (files appear briefly then get consumed by host)
+ls -lt data/ipc/{group_folder}/messages/
+```
+
+### 4. Check task execution status in DB
+```bash
+# Current task state
+sqlite3 store/messages.db "SELECT id, status, last_run, substr(last_result,1,200) FROM scheduled_tasks WHERE id = 'TASK_ID'"
+
+# Detailed run history
+sqlite3 store/messages.db "SELECT run_at, duration_ms, status, substr(result,1,200) FROM task_run_logs WHERE task_id = 'TASK_ID' ORDER BY run_at DESC LIMIT 5"
+```
+
+### 5. Check for new data being written (e.g. insight pipeline)
+```bash
+# New insight sources since a timestamp
+sqlite3 store/messages.db "SELECT title, indexed_at FROM insight_sources WHERE indexed_at >= '2026-02-22T01:00' ORDER BY indexed_at DESC"
+
+# New insights since a timestamp
+sqlite3 store/messages.db "SELECT substr(text,1,80), category, first_seen FROM insights WHERE first_seen >= '2026-02-22T01:00' ORDER BY first_seen DESC LIMIT 20"
+```
+
+### 6. Post-execution logs
+After a container exits, a detailed log is written to:
+```
+groups/{group_folder}/logs/container-{ISO-timestamp}.log
+```
+Includes: duration, exit code, stderr, stdout, mount config (verbose when errors occur).
+
 ## Quick Diagnostic Script
 
 Run this to check common issues:

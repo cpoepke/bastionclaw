@@ -47,6 +47,10 @@ Service management:
 
 **Always use `scripts/restart.sh`** instead of raw launchctl commands. It cleans up orphaned containers, stale processes, and port conflicts before restarting.
 
+## Monitoring Running Agents
+
+To check progress of a running container agent: `container list` to find it, `container exec {name} ps aux` to verify, then query DB for new data (e.g. `insight_sources`, `insights`, `task_run_logs`). Full details in `/debug` skill under "Monitoring Running Container Agents".
+
 ## Container Build Cache
 
 Apple Container's buildkit caches the build context aggressively. `--no-cache` alone does NOT invalidate COPY steps — the builder's volume retains stale files. To force a truly clean rebuild:
