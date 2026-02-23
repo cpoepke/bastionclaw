@@ -34,9 +34,9 @@ NanoClaw gives you the same core functionality in a codebase you can understand 
 I needed a personal Claude assistant tailored for cybersecurity work. NanoClaw's container isolation model and small codebase made it the ideal foundation. This fork adds:
 
 - **Telegram-first setup** — Official bot API is more reliable than WhatsApp's unofficial library, and better suited for automated workflows
-- **Web control panel** — Full browser-based UI for monitoring agent sessions, managing tasks, viewing logs, and chatting directly with the agent without needing a phone
+- **Web control panel** — Full browser-based UI for monitoring agent sessions, managing tasks, viewing logs, querying the qmd semantic memory system, and chatting directly with the agent without needing a phone
 - **Security cherry-picks** — Backported upstream security PRs (CPU/memory limits, secret sanitization, per-group IPC namespaces, mount allowlist) to harden the fork for sensitive workflows like penetration testing and threat analysis
-- **Semantic memory + insight engine** — Long-term memory powered by hybrid search (BM25 + vector embeddings) running fully local with GGUF models. Data-to-Wisdom pipeline ingests YouTube videos, articles, and PDFs, extracts generalizable insights, deduplicates semantically across sources, and surfaces corroborated patterns
+- **Semantic memory + insight engine** — Long-term memory powered by hybrid search (BM25 + vector embeddings) running fully local with GGUF models. Optional Data-to-Wisdom pipeline ingests YouTube videos, articles, and PDFs, extracts generalizable insights, deduplicates semantically across sources, and surfaces corroborated patterns
 - **Windows + Docker support** — Full WSL2 setup guide with Docker/Podman as container runtime alternatives to Apple Container
 
 The upstream project's philosophy of "skills over features" means these customizations stay clean and maintainable.
@@ -119,11 +119,12 @@ WSL2 shuts down when you close all terminal windows. To keep BastionClaw running
 - **Agent Swarms** — Spin up teams of specialized agents that collaborate on complex tasks
 - **Optional integrations** — Add Gmail (`/add-gmail`) and more via skills
 - **Semantic memory** — Long-term memory powered by [qmd](https://github.com/tobi/qmd) with hybrid search (BM25 + vector + LLM reranking). Conversations are progressively indexed mid-session and archived at compaction. The agent naturally recalls past discussions without being asked. Runs fully local with GGUF models (~2GB) — no cloud APIs needed. See [docs/MEMORY.md](docs/MEMORY.md) for architecture details.
-- **Insight engine** — Ingest articles, YouTube videos, PDFs, and podcasts to extract generalizable insights. The system deduplicates semantically — when multiple independent sources express the same idea, they merge and the insight's corroboration count rises. Top insights surface the most widely-observed principles across all your content. See [docs/INSIGHTS.md](docs/INSIGHTS.md) for architecture details.
+- **Insight engine** (optional) — Ingest articles, YouTube videos, PDFs, and podcasts to extract generalizable insights. The system deduplicates semantically — when multiple independent sources express the same idea, they merge and the insight's corroboration count rises. Top insights surface the most widely-observed principles across all your content. See [docs/INSIGHTS.md](docs/INSIGHTS.md) for architecture details.
 
 <p align="center">
   <img src="docs/insights-architecture-overview.png" alt="Insight Tracking System" width="600">
 </p>
+
 - **Web control panel** — Browser-based UI for monitoring, chat, and management
 
 ## Web Interface
