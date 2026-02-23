@@ -14,8 +14,10 @@ import {
   DATA_DIR,
   GROUPS_DIR,
   IDLE_TIMEOUT,
+  TIMEZONE,
   getContainerRuntime,
 } from './config.js';
+import { isValidGroupFolder } from './group-folder.js';
 import { logger } from './logger.js';
 import { validateAdditionalMounts } from './mount-security.js';
 import { RegisteredGroup } from './types.js';
@@ -62,16 +64,21 @@ function buildVolumeMounts(
   group: RegisteredGroup,
   isMain: boolean,
 ): VolumeMount[] {
+  if (!isValidGroupFolder(group.folder)) {
+    throw new Error(`Invalid group folder name: ${group.folder}`);
+  }
+
   const mounts: VolumeMount[] = [];
   const homeDir = getHomeDir();
   const projectRoot = process.cwd();
 
   if (isMain) {
-    // Main gets the entire project root mounted
+    // Main gets the entire project root mounted (read-only to prevent sandbox escape
+    // via modification of dist/ or container scripts)
     mounts.push({
       hostPath: projectRoot,
       containerPath: '/workspace/project',
-      readonly: false,
+      readonly: true,
     });
 
     // Main also gets its group folder as the working directory
@@ -134,12 +141,8 @@ function buildVolumeMounts(
       const srcDir = path.join(skillsSrc, skillDir);
       if (!fs.statSync(srcDir).isDirectory()) continue;
       const dstDir = path.join(skillsDst, skillDir);
-      fs.mkdirSync(dstDir, { recursive: true });
-      for (const file of fs.readdirSync(srcDir)) {
-        const srcFile = path.join(srcDir, file);
-        const dstFile = path.join(dstDir, file);
-        fs.copyFileSync(srcFile, dstFile);
-      }
+      // Use recursive copy to handle subdirectories (avoids EISDIR crash)
+      fs.cpSync(srcDir, dstDir, { recursive: true });
     }
   }
   mounts.push({
@@ -221,6 +224,9 @@ function buildContainerArgs(mounts: VolumeMount[], containerName: string): strin
 
   // Resource limits: prevent CPU/memory exhaustion from runaway or malicious processes
   args.push('--cpus', '2', '--memory', '512M');
+
+  // Pass host timezone so scheduled tasks fire at correct local times
+  args.push('-e', `TZ=${TIMEZONE}`);
 
   for (const mount of mounts) {
     if (runtime === 'container') {

@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { DATA_DIR, STORE_DIR } from './config.js';
+import { isValidGroupFolder } from './group-folder.js';
 import { NewMessage, RegisteredGroup, ScheduledTask, TaskRunLog } from './types.js';
 
 let db: Database.Database;
@@ -281,10 +282,12 @@ export function getNewMessages(
 
   const placeholders = jids.map(() => '?').join(',');
   // Filter out bot's own messages by checking content prefix (not is_from_me, since user shares the account)
+  // Also filter empty messages (delivery receipts, encryption key distribution)
   const sql = `
     SELECT id, chat_jid, sender, sender_name, content, timestamp
     FROM messages
     WHERE timestamp > ? AND chat_jid IN (${placeholders}) AND content NOT LIKE ?
+      AND content != '' AND content IS NOT NULL
     ORDER BY timestamp
   `;
 
@@ -306,10 +309,12 @@ export function getMessagesSince(
   botPrefix: string,
 ): NewMessage[] {
   // Filter out bot's own messages by checking content prefix
+  // Also filter empty messages (delivery receipts, encryption key distribution)
   const sql = `
     SELECT id, chat_jid, sender, sender_name, content, timestamp
     FROM messages
     WHERE chat_jid = ? AND timestamp > ? AND content NOT LIKE ?
+      AND content != '' AND content IS NOT NULL
     ORDER BY timestamp
   `;
   return db
@@ -527,6 +532,9 @@ export function setRegisteredGroup(
   jid: string,
   group: RegisteredGroup,
 ): void {
+  if (!isValidGroupFolder(group.folder)) {
+    throw new Error(`Invalid group folder name: ${group.folder}`);
+  }
   db.prepare(
     `INSERT OR REPLACE INTO registered_groups (jid, name, folder, trigger_pattern, added_at, container_config, requires_trigger)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -555,6 +563,9 @@ export function getAllRegisteredGroups(): Record<string, RegisteredGroup> {
   }>;
   const result: Record<string, RegisteredGroup> = {};
   for (const row of rows) {
+    if (!isValidGroupFolder(row.folder)) {
+      continue; // Skip groups with invalid folder names
+    }
     result[row.jid] = {
       name: row.name,
       folder: row.folder,

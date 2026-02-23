@@ -80,7 +80,8 @@ export class WhatsAppChannel implements Channel {
 
       if (connection === 'close') {
         this.connected = false;
-        const reason = (lastDisconnect?.error as any)?.output?.statusCode;
+        const errObj = lastDisconnect?.error as { output?: { statusCode?: number } } | undefined;
+        const reason = errObj?.output?.statusCode;
         const shouldReconnect = reason !== DisconnectReason.loggedOut;
         logger.info({ reason, shouldReconnect, queuedMessages: this.outgoingQueue.length }, 'Connection closed');
 
@@ -213,11 +214,8 @@ export class WhatsAppChannel implements Channel {
   }
 
   async setTyping(jid: string, isTyping: boolean): Promise<void> {
-    try {
-      await this.sock.sendPresenceUpdate(isTyping ? 'composing' : 'paused', jid);
-    } catch (err) {
-      logger.debug({ jid, err }, 'Failed to update typing status');
-    }
+    this.sock.sendPresenceUpdate(isTyping ? 'composing' : 'paused', jid)
+      .catch((err) => logger.debug({ jid, err }, 'Failed to update typing status'));
   }
 
   /**

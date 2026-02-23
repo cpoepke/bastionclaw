@@ -35,7 +35,9 @@ I needed a personal Claude assistant tailored for cybersecurity work. NanoClaw's
 
 - **Telegram-first setup** — Official bot API is more reliable than WhatsApp's unofficial library, and better suited for automated workflows
 - **Web control panel** — Full browser-based UI for monitoring agent sessions, managing tasks, viewing logs, and chatting directly with the agent without needing a phone
-- **Security research tooling** — Custom skills and configurations for penetration testing, threat analysis, and security automation workflows
+- **Security cherry-picks** — Backported upstream security PRs (CPU/memory limits, secret sanitization, per-group IPC namespaces, mount allowlist) to harden the fork for sensitive workflows like penetration testing and threat analysis
+- **Semantic memory + insight engine** — Long-term memory powered by hybrid search (BM25 + vector embeddings) running fully local with GGUF models. Data-to-Wisdom pipeline ingests YouTube videos, articles, and PDFs, extracts generalizable insights, deduplicates semantically across sources, and surfaces corroborated patterns
+- **Windows + Docker support** — Full WSL2 setup guide with Docker/Podman as container runtime alternatives to Apple Container
 
 The upstream project's philosophy of "skills over features" means these customizations stay clean and maintainable.
 

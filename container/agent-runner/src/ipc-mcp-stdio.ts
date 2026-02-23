@@ -113,10 +113,18 @@ SCHEDULE VALUE FORMAT (all times are LOCAL timezone):
         };
       }
     } else if (args.schedule_type === 'once') {
+      // Reject UTC-suffixed timestamps — the host interprets "once" values as local time.
+      // A "Z" or "+HH:MM" offset would cause the task to fire at the wrong time.
+      if (/Z$/.test(args.schedule_value) || /[+-]\d{2}:\d{2}$/.test(args.schedule_value)) {
+        return {
+          content: [{ type: 'text' as const, text: `Timestamps for "once" tasks must be local time without timezone suffix. Use "2026-02-01T15:30:00" instead of "${args.schedule_value}".` }],
+          isError: true,
+        };
+      }
       const date = new Date(args.schedule_value);
       if (isNaN(date.getTime())) {
         return {
-          content: [{ type: 'text' as const, text: `Invalid timestamp: "${args.schedule_value}". Use ISO 8601 format like "2026-02-01T15:30:00.000Z".` }],
+          content: [{ type: 'text' as const, text: `Invalid timestamp: "${args.schedule_value}". Use local time format like "2026-02-01T15:30:00" (no Z suffix).` }],
           isError: true,
         };
       }

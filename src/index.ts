@@ -38,6 +38,7 @@ import {
   storeChatMetadata,
   storeMessage,
 } from './db.js';
+import { isValidGroupFolder, resolveGroupFolderPath } from './group-folder.js';
 import { GroupQueue } from './group-queue.js';
 import { startIpcWatcher } from './ipc.js';
 import { findChannel, formatMessages, formatOutbound } from './router.js';
@@ -86,11 +87,15 @@ function saveState(): void {
 }
 
 function registerGroup(jid: string, group: RegisteredGroup): void {
+  if (!isValidGroupFolder(group.folder)) {
+    logger.error({ folder: group.folder }, 'Rejected group with invalid folder name');
+    return;
+  }
   registeredGroups[jid] = group;
   setRegisteredGroup(jid, group);
 
-  // Create group folder
-  const groupDir = path.join(DATA_DIR, '..', 'groups', group.folder);
+  // Create group folder (validated path)
+  const groupDir = resolveGroupFolderPath(group.folder);
   fs.mkdirSync(path.join(groupDir, 'logs'), { recursive: true });
 
   logger.info(
@@ -205,6 +210,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     } else if (result.status !== 'error') {
       // Null result = agent query/turn completed (waiting for next input)
       logger.info({ group: group.name }, 'Agent query completed');
+      queue.notifyIdle(chatJid);
     }
 
     if (result.status === 'error') {
@@ -611,7 +617,10 @@ async function main(): Promise<void> {
   queue.setProcessMessagesFn(processGroupMessages);
   recoverPendingMessages();
 
-  startMessageLoop();
+  startMessageLoop().catch((err) => {
+    logger.error({ err }, 'Fatal error in message loop');
+    process.exit(1);
+  });
 }
 
 // Guard: only run when executed directly, not when imported by tests

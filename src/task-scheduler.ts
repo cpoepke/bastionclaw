@@ -6,11 +6,11 @@ import path from 'path';
 import {
   ASSISTANT_NAME,
   GROUPS_DIR,
-  IDLE_TIMEOUT,
   MAIN_GROUP_FOLDER,
   SCHEDULER_POLL_INTERVAL,
   TIMEZONE,
 } from './config.js';
+import { isValidGroupFolder } from './group-folder.js';
 import { ContainerOutput, runContainerAgent, writeTasksSnapshot } from './container-runner.js';
 import {
   getAllTasks,
@@ -45,6 +45,24 @@ async function runTask(
     'Running scheduled task',
   );
 
+  // Validate group folder before any filesystem operations
+  if (!isValidGroupFolder(task.group_folder)) {
+    logger.error(
+      { taskId: task.id, groupFolder: task.group_folder },
+      'Invalid group folder for task, pausing to prevent retry loop',
+    );
+    logTaskRun({
+      task_id: task.id,
+      run_at: new Date().toISOString(),
+      duration_ms: Date.now() - startTime,
+      status: 'error',
+      result: null,
+      error: `Invalid group folder: ${task.group_folder}`,
+    });
+    updateTask(task.id, { status: 'paused' });
+    return;
+  }
+
   const groups = deps.registeredGroups();
   const group = Object.values(groups).find(
     (g) => g.folder === task.group_folder,
@@ -53,7 +71,7 @@ async function runTask(
   if (!group) {
     logger.error(
       { taskId: task.id, groupFolder: task.group_folder },
-      'Group not found for task',
+      'Group not found for task, pausing to prevent retry loop',
     );
     logTaskRun({
       task_id: task.id,
@@ -63,6 +81,7 @@ async function runTask(
       result: null,
       error: `Group not found: ${task.group_folder}`,
     });
+    updateTask(task.id, { status: 'paused' });
     return;
   }
 
@@ -91,8 +110,10 @@ async function runTask(
   const sessionId =
     task.context_mode === 'group' ? sessions[task.group_folder] : undefined;
 
-  // Idle timer: writes _close sentinel after IDLE_TIMEOUT of no output,
-  // so the container exits instead of hanging at waitForIpcMessage forever.
+  // Task containers use a short close delay (10s) instead of the full idle timeout.
+  // Tasks don't receive follow-up messages, so there's no reason to keep them alive.
+  const TASK_CLOSE_DELAY_MS = 10_000;
+
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   const resetIdleTimer = () => {
@@ -100,7 +121,7 @@ async function runTask(
     idleTimer = setTimeout(() => {
       logger.debug({ taskId: task.id }, 'Scheduled task idle timeout, closing container stdin');
       deps.queue.closeStdin(task.chat_jid);
-    }, IDLE_TIMEOUT);
+    }, TASK_CLOSE_DELAY_MS);
   };
 
   try {
@@ -126,6 +147,7 @@ async function runTask(
         } else if (streamedOutput.status !== 'error') {
           // Null result = agent query/turn completed
           logger.info({ group: group.name, taskId: task.id }, 'Agent query completed');
+          deps.queue.notifyIdle(task.chat_jid);
         }
         if (streamedOutput.status === 'error') {
           error = streamedOutput.error || 'Unknown error';

@@ -15,6 +15,7 @@ import {
   MAIN_GROUP_FOLDER,
   TIMEZONE,
 } from './config.js';
+import { isValidGroupFolder } from './group-folder.js';
 import { AvailableGroup } from './container-runner.js';
 import {
   createTask, deleteTask, getTaskById, updateTask,
@@ -390,6 +391,13 @@ export async function processTaskIpc(
         break;
       }
       if (data.jid && data.name && data.folder && data.trigger) {
+        if (!isValidGroupFolder(data.folder)) {
+          logger.warn(
+            { folder: data.folder },
+            'Invalid group folder name in register_group request',
+          );
+          break;
+        }
         deps.registerGroup(data.jid, {
           name: data.name,
           folder: data.folder,
