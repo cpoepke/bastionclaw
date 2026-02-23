@@ -393,6 +393,7 @@ async function runQuery(
 
   let newSessionId: string | undefined;
   let lastAssistantUuid: string | undefined;
+  let lastAssistantText: string | undefined;
   let messageCount = 0;
   let resultCount = 0;
   const capturedMessages: ParsedMessage[] = [];
@@ -471,11 +472,14 @@ async function runQuery(
 
     if (message.type === 'assistant' && 'uuid' in message) {
       lastAssistantUuid = (message as { uuid: string }).uuid;
-      // Capture assistant text for progressive indexing
+      // Capture assistant text for progressive indexing and result fallback
       const content = (message as { message?: { content?: Array<{ type: string; text?: string }> } }).message?.content;
       if (Array.isArray(content)) {
         const text = content.filter(c => c.type === 'text').map(c => c.text || '').join('');
-        if (text) capturedMessages.push({ role: 'assistant', content: text });
+        if (text) {
+          lastAssistantText = text;
+          capturedMessages.push({ role: 'assistant', content: text });
+        }
       }
     }
 
@@ -492,12 +496,17 @@ async function runQuery(
     if (message.type === 'result') {
       resultCount++;
       const textResult = 'result' in message ? (message as { result?: string }).result : null;
-      log(`Result #${resultCount}: subtype=${message.subtype}${textResult ? ` text=${textResult.slice(0, 200)}` : ''}`);
+      // When the agent writes text then does a final tool call (e.g. closing the
+      // browser), the result event has no text. Fall back to the last assistant
+      // text so the user still gets the response.
+      const effectiveResult = textResult || lastAssistantText || null;
+      log(`Result #${resultCount}: subtype=${message.subtype}${effectiveResult ? ` text=${effectiveResult.slice(0, 200)}` : ''}`);
       writeOutput({
         status: 'success',
-        result: textResult || null,
+        result: effectiveResult,
         newSessionId
       });
+      lastAssistantText = undefined;
       // Signal no more user messages so query() iterator terminates.
       // The outer loop in main() will pick up subsequent IPC messages.
       stream.end();
