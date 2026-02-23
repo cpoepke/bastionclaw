@@ -23,6 +23,10 @@ This is the primary security boundary. Rather than relying on application-level 
 
 ### 2. Mount Security
 
+**Read-Only Project Root** — The main group's project root mount is read-only, preventing a compromised agent from modifying host code (e.g., `dist/container-runner.js`) to inject mounts on next restart. The agent reads source and DB via the read-only mount; all mutations go through IPC/MCP tools processed by the trusted host.
+
+**Group Folder Path Validation** — Group folder names are validated against a strict allowlist (`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`) before use in any `path.join()` call. The `resolveGroupFolderPath()` and `resolveGroupIpcPath()` helpers additionally verify the resolved path doesn't escape its base directory. Validation is enforced at all entry points: DB writes, IPC handlers, container mount construction, task scheduling, and group registration.
+
 **External Allowlist** - Mount permissions stored at `~/.config/bastionclaw/mount-allowlist.json`, which is:
 - Outside project root
 - Never mounted into containers
@@ -82,12 +86,20 @@ const allowedVars = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY'];
 
 | Capability | Main Group | Non-Main Group |
 |------------|------------|----------------|
-| Project root access | `/workspace/project` (rw) | None |
+| Project root access | `/workspace/project` (ro) | None |
 | Group folder | `/workspace/group` (rw) | `/workspace/group` (rw) |
-| Global memory | Implicit via project | `/workspace/global` (ro) |
+| Global memory | Read via project mount | `/workspace/global` (ro) |
 | Additional mounts | Configurable | Read-only unless allowed |
 | Network access | Unrestricted | Unrestricted |
 | MCP tools | All | All |
+
+## Process Stability
+
+- **Unhandled rejection protection** — All fire-and-forget async calls (message loop, group queue drain, task execution) have `.catch()` handlers to prevent Node process crashes on disconnect or container failure.
+- **Malformed task auto-pause** — Scheduled tasks with invalid group folders or missing groups are automatically paused instead of retry-looping indefinitely.
+- **Idle preemption safety** — The task queue only signals idle containers to exit when new work arrives; containers actively processing messages are never preempted. Task containers use a short 10s close delay instead of the full 30-minute idle timeout.
+- **Timezone consistency** — Containers receive the host's `TZ` environment variable. "Once" scheduled tasks reject UTC-suffixed timestamps to prevent timezone mismatch.
+- **Empty message filtering** — Delivery receipts and encryption key distribution messages (empty content) are excluded from DB polling to prevent spurious agent spawns.
 
 ## Security Architecture Diagram
 

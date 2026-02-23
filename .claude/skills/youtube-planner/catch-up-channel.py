@@ -14,7 +14,10 @@ import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-DB_PATH = Path('/Users/allenharper/bastionclaw/store/messages.db')
+SCRIPT_DIR = Path(__file__).resolve().parent
+# Navigate up from .claude/skills/youtube-planner/ to project root
+PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
+DB_PATH = PROJECT_ROOT / 'store' / 'messages.db'
 
 
 def sanitize(text):
@@ -48,9 +51,11 @@ def main():
         print("Error: TRANSCRIPT_API_KEY not set")
         sys.exit(1)
 
-    # Setup paths (use absolute path to bastionclaw workspace)
-    bastionclaw_root = Path('/Users/allenharper/bastionclaw')
-    base = bastionclaw_root / 'workspace' / 'group' / 'youtube'
+    # In container: /workspace/group/youtube. On host: groups/main/youtube.
+    if Path('/workspace/group').exists():
+        base = Path('/workspace/group/youtube')
+    else:
+        base = PROJECT_ROOT / 'groups' / 'main' / 'youtube'
     base.mkdir(parents=True, exist_ok=True)
 
     # Fetch latest videos from channel

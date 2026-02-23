@@ -14,7 +14,13 @@ import time
 from pathlib import Path
 
 DRY_RUN = '--dry-run' in sys.argv
-BASE = Path('/Users/allenharper/bastionclaw/workspace/group/youtube')
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+
+if Path('/workspace/group').exists():
+    BASE = Path('/workspace/group/youtube')
+else:
+    BASE = PROJECT_ROOT / 'groups' / 'main' / 'youtube'
 
 
 def find_missing():

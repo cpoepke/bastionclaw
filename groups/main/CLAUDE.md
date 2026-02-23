@@ -84,17 +84,16 @@ This is the **main channel**, which has elevated privileges.
 
 ## Container Mounts
 
-Main has access to the entire project:
-
 | Container Path | Host Path | Access |
 |----------------|-----------|--------|
-| `/workspace/project` | Project root | read-write |
+| `/workspace/project` | Project root | **read-only** |
 | `/workspace/group` | `groups/main/` | read-write |
 
-Key paths inside the container:
-- `/workspace/project/store/messages.db` - SQLite database
-- `/workspace/project/store/messages.db` (registered_groups table) - Group config
-- `/workspace/project/groups/` - All group folders
+**IMPORTANT: `/workspace/project` is READ-ONLY.** Do not run `sqlite3` writes, modify files under `/workspace/project/`, or create directories there. Use IPC and MCP tools for all mutations:
+- DB reads: `sqlite3 /workspace/project/store/messages.db "SELECT ..."` (reads are fine)
+- DB writes: Use MCP tools (`mcp__bastionclaw__*`) or IPC files in `/workspace/ipc/tasks/`
+- Group registration: Use `register_group` IPC (see below)
+- File writes: Use `/workspace/group/` for your own files
 
 ---
 
@@ -128,7 +127,7 @@ echo '{"type": "refresh_groups"}' > /workspace/ipc/tasks/refresh_$(date +%s).jso
 
 Then wait a moment and re-read `available_groups.json`.
 
-**Fallback**: Query the SQLite database directly:
+**Fallback**: Query the SQLite database (read-only):
 
 ```bash
 sqlite3 /workspace/project/store/messages.db "
@@ -142,26 +141,18 @@ sqlite3 /workspace/project/store/messages.db "
 
 ### Registered Groups Config
 
-Groups are registered in `/workspace/project/data/registered_groups.json`:
+Groups are stored in the SQLite database (`registered_groups` table). To list them:
 
-```json
-{
-  "1234567890-1234567890@g.us": {
-    "name": "Family Chat",
-    "folder": "family-chat",
-    "trigger": "@Kia",
-    "added_at": "2024-01-31T12:00:00.000Z"
-  }
-}
+```bash
+sqlite3 /workspace/project/store/messages.db "SELECT jid, name, folder, trigger_pattern FROM registered_groups"
 ```
 
 Fields:
-- **Key**: The WhatsApp JID (unique identifier for the chat)
+- **jid**: The WhatsApp/Telegram JID (unique identifier for the chat)
 - **name**: Display name for the group
 - **folder**: Folder name under `groups/` for this group's files and memory
-- **trigger**: The trigger word (usually same as global, but could differ)
-- **requiresTrigger**: Whether `@trigger` prefix is needed (default: `true`). Set to `false` for solo/personal chats where all messages should be processed
-- **added_at**: ISO timestamp when registered
+- **trigger_pattern**: The trigger word (usually same as global, but could differ)
+- **requires_trigger**: Whether `@trigger` prefix is needed (default: `1`). Set to `0` for solo/personal chats where all messages should be processed
 
 ### Trigger Behavior
 
@@ -171,60 +162,39 @@ Fields:
 
 ### Adding a Group
 
-1. Query the database to find the group's JID
-2. Read `/workspace/project/data/registered_groups.json`
-3. Add the new group entry with `containerConfig` if needed
-4. Write the updated JSON back
-5. Create the group folder: `/workspace/project/groups/{folder-name}/`
-6. Optionally create an initial `CLAUDE.md` for the group
+Use the `register_group` IPC to add groups (the host creates the folder and DB entry):
 
-Example folder name conventions:
-- "Family Chat" → `family-chat`
-- "Work Team" → `work-team`
-- Use lowercase, hyphens instead of spaces
-
-#### Adding Additional Directories for a Group
-
-Groups can have extra directories mounted. Add `containerConfig` to their entry:
-
-```json
+```bash
+cat > /workspace/ipc/tasks/register_$(date +%s).json << 'EOF'
 {
-  "1234567890@g.us": {
-    "name": "Dev Team",
-    "folder": "dev-team",
-    "trigger": "@Kia",
-    "added_at": "2026-01-31T12:00:00Z",
-    "containerConfig": {
-      "additionalMounts": [
-        {
-          "hostPath": "~/projects/webapp",
-          "containerPath": "webapp",
-          "readonly": false
-        }
-      ]
-    }
-  }
+  "type": "register_group",
+  "jid": "120363336345536173@g.us",
+  "name": "Family Chat",
+  "folder": "family-chat",
+  "trigger": "@Kia"
 }
+EOF
 ```
 
-The directory will appear at `/workspace/extra/webapp` in that group's container.
+Optional: include `"containerConfig"` with `"additionalMounts"` for extra directories.
+
+Folder name conventions: lowercase, hyphens instead of spaces (e.g., "Family Chat" → `family-chat`).
 
 ### Removing a Group
 
-1. Read `/workspace/project/data/registered_groups.json`
-2. Remove the entry for that group
-3. Write the updated JSON back
-4. The group folder and its files remain (don't delete them)
+To remove a group, delete its entry from the database via IPC or inform the user to remove it from the host. The group folder and files are preserved.
 
 ### Listing Groups
 
-Read `/workspace/project/data/registered_groups.json` and format it nicely.
+```bash
+sqlite3 /workspace/project/store/messages.db "SELECT jid, name, folder FROM registered_groups"
+```
 
 ---
 
 ## Global Memory
 
-You can read and write to `/workspace/project/groups/global/CLAUDE.md` for facts that should apply to all groups. Only update global memory when explicitly asked to "remember this globally" or similar.
+You can read `/workspace/project/groups/global/CLAUDE.md` for facts that apply to all groups. To update global memory, write to `/workspace/group/global-notes.md` (your writable area) and note the update for the user.
 
 ---
 

@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { execFileSync } from 'child_process';
+import { execFile, execFileSync, spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -203,6 +203,9 @@ export async function processTaskIpc(
     sortBy?: string;
     limit?: number;
     offset?: number;
+    // For dedup_insights
+    threshold?: number;
+    dryRun?: boolean;
   },
   sourceGroup: string, // Verified identity from IPC directory
   isMain: boolean, // Verified from directory path
@@ -653,6 +656,36 @@ export async function processTaskIpc(
       const offset = data.offset || 0;
       const result = getTopInsights(sourceGroup, limit, offset, data.category, sortBy as 'source_count' | 'recent');
       writeIpcResponse(sourceGroup, requestId, result);
+      break;
+    }
+
+    case 'dedup_insights': {
+      const requestId = data.requestId;
+      if (!requestId) break;
+
+      const scriptPath = path.join(process.cwd(), 'scripts', 'dedup-insights.py');
+      if (!fs.existsSync(scriptPath)) {
+        writeIpcResponse(sourceGroup, requestId, { ok: false, error: 'dedup-insights.py not found' });
+        break;
+      }
+
+      // Fire-and-forget: spawn detached so it runs to completion regardless of
+      // container lifetime. Dedup can take hours on large initial ingests.
+      const args = [scriptPath];
+      if (data.threshold) args.push('--threshold', String(data.threshold));
+      if (data.dryRun) args.push('--dry-run');
+
+      logger.info({ sourceGroup, threshold: data.threshold }, 'Spawning dedup-insights on host (fire-and-forget)');
+      try {
+        const child = spawn('python3', args, {
+          detached: true,
+          stdio: 'ignore',
+        });
+        child.unref();
+        writeIpcResponse(sourceGroup, requestId, { ok: true, output: 'Dedup started on host (running in background). Check DB for progress: SELECT count(*) FROM insights WHERE dedup_checked_at IS NOT NULL' });
+      } catch (err) {
+        writeIpcResponse(sourceGroup, requestId, { ok: false, error: err instanceof Error ? err.message : String(err) });
+      }
       break;
     }
 

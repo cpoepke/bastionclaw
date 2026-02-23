@@ -12,12 +12,12 @@ Interactive command to manage YouTube sources and run the full insight extractio
 Check that required API keys are available in `.env`:
 
 ```bash
-grep -c 'TRANSCRIPT_API_KEY' /Users/allenharper/bastionclaw/.env 2>/dev/null
+grep -c 'TRANSCRIPT_API_KEY' .env 2>/dev/null
 ```
 
 If `TRANSCRIPT_API_KEY` is not in `.env`, tell the user:
 > TRANSCRIPT_API_KEY is required for fetching YouTube transcripts via TranscriptAPI.
-> Add it to `/Users/allenharper/bastionclaw/.env`
+> Add it to `.env`
 
 Do not proceed until the key is confirmed.
 
@@ -26,13 +26,13 @@ Do not proceed until the key is confirmed.
 Read sources.json to see if this has been configured before:
 
 ```bash
-cat /Users/allenharper/bastionclaw/.claude/skills/youtube-planner/sources.json 2>/dev/null
+cat .claude/skills/youtube-planner/sources.json 2>/dev/null
 ```
 
 Also check if a cron task is already scheduled in BastionClaw:
 
 ```bash
-sqlite3 /Users/allenharper/bastionclaw/store/messages.db "SELECT id, schedule_value, status FROM scheduled_tasks WHERE id LIKE 'refresh-insights%' AND schedule_type = 'cron'"
+sqlite3 store/messages.db "SELECT id, schedule_value, status FROM scheduled_tasks WHERE id LIKE 'refresh-insights%' AND schedule_type = 'cron'"
 ```
 
 ### If sources.json EXISTS AND has lookback_days AND cron task exists (subsequent run):
@@ -90,7 +90,7 @@ When saving sources.json, use this format:
 
 Check if a refresh-insights cron task already exists:
 ```bash
-sqlite3 /Users/allenharper/bastionclaw/store/messages.db "SELECT id, schedule_value, status FROM scheduled_tasks WHERE id LIKE 'refresh-insights%' AND schedule_type = 'cron'"
+sqlite3 store/messages.db "SELECT id, schedule_value, status FROM scheduled_tasks WHERE id LIKE 'refresh-insights%' AND schedule_type = 'cron'"
 ```
 
 If already exists, show the current schedule and ask if they want to keep it or change it.
@@ -104,26 +104,27 @@ If not installed, ask: "How frequently should this pipeline run automatically?" 
 
 Note: BastionClaw's task scheduler interprets cron expressions in local timezone (auto-adjusts for DST).
 
-Install as a BastionClaw scheduled task (the agent has access to the bastionclaw project root at `/workspace/project/`):
+Install as a BastionClaw scheduled task. The agent has read-only access to the project root at `/workspace/project/` and read-write access to `/workspace/group/`. Look up the main group's chat_jid from the DB before inserting:
 
 ```bash
-sqlite3 /Users/allenharper/bastionclaw/store/messages.db "INSERT OR REPLACE INTO scheduled_tasks (id, group_folder, chat_jid, prompt, schedule_type, schedule_value, next_run, status, created_at, context_mode) VALUES (
+CHAT_JID=$(sqlite3 store/messages.db "SELECT jid FROM registered_groups WHERE folder = 'main' LIMIT 1")
+sqlite3 store/messages.db "INSERT OR REPLACE INTO scheduled_tasks (id, group_folder, chat_jid, prompt, schedule_type, schedule_value, next_run, status, created_at, context_mode) VALUES (
   'refresh-insights-cron',
   'main',
-  'tg:6246700152',
+  '$CHAT_JID',
   'Run the insight refresh pipeline. Execute these steps in order:
 
 1. Read /workspace/project/.claude/skills/youtube-planner/sources.json for the channel list and lookback_days.
 2. For each channel, run: python3 /workspace/project/.claude/skills/youtube-planner/catch-up-channel.py @CHANNEL lookback_days
    (pass TRANSCRIPT_API_KEY from environment)
-3. IMMEDIATELY after all channels are fetched, update sources.json to set lookback_days to 1 (so future runs only pull the last day of videos).
+3. IMMEDIATELY after all channels are fetched, update sources.json to set lookback_days to 1 (so future runs only pull the last day of videos). If the write fails because the filesystem is read-only, skip this step — it is non-critical.
 4. Find all new transcript.json files that are not yet indexed in insight_sources. For each one:
    - Check duration: read the transcript JSON, get the last segment start time. If < 120 seconds, SKIP it (it is a Short).
    - Read the metadata and transcript
    - You MUST extract at least 10 insights per video (target 10-15). Do NOT reduce this number for efficiency or any other reason. Each insight should be a distinct, actionable takeaway.
    - Use add_insight for each (pass source_metadata as JSON string with author, published, viewCount, videoId)
    - Do NOT call search_insights or link_insight_source
-5. Run: python3 /workspace/project/scripts/dedup-insights.py
+5. Run dedup using the dedup_insights MCP tool (do NOT run the python script directly — the DB is read-only in the container)
 6. Send a summary via send_message: channels fetched, new transcripts, insights extracted, shorts skipped, dedup merges.',
   'cron',
   'SELECTED_CRON',
@@ -138,7 +139,7 @@ Replace `SELECTED_CRON` with the user's chosen cron expression (e.g. `0 0,12 * *
 
 Verify:
 ```bash
-sqlite3 /Users/allenharper/bastionclaw/store/messages.db "SELECT id, schedule_value, status FROM scheduled_tasks WHERE id = 'refresh-insights-cron'"
+sqlite3 store/messages.db "SELECT id, schedule_value, status FROM scheduled_tasks WHERE id = 'refresh-insights-cron'"
 ```
 
 ## Step 4: Run Pipeline Immediately
@@ -146,7 +147,7 @@ sqlite3 /Users/allenharper/bastionclaw/store/messages.db "SELECT id, schedule_va
 Run the pipeline with env vars from .env:
 
 ```bash
-export $(grep -v '^#' /Users/allenharper/bastionclaw/.env | xargs) && python3 /Users/allenharper/bastionclaw/scripts/refresh-insights.py
+export $(grep -v '^#' .env | xargs) && python3 scripts/refresh-insights.py
 ```
 
 Stream output to the user. This may take a while depending on the number of channels and lookback period.
@@ -164,15 +165,15 @@ $RUNTIME list 2>/dev/null || $RUNTIME ps 2>/dev/null
 $RUNTIME exec bastionclaw-main-{timestamp} ps aux
 
 # 3. Check new sources indexed since pipeline started
-sqlite3 /Users/allenharper/bastionclaw/store/messages.db \
+sqlite3 store/messages.db \
   "SELECT title, indexed_at FROM insight_sources WHERE indexed_at >= 'START_TIMESTAMP' ORDER BY indexed_at DESC"
 
 # 4. Check new insights extracted since pipeline started
-sqlite3 /Users/allenharper/bastionclaw/store/messages.db \
+sqlite3 store/messages.db \
   "SELECT substr(text,1,80), category, first_seen FROM insights WHERE first_seen >= 'START_TIMESTAMP' ORDER BY first_seen DESC LIMIT 20"
 
 # 5. Check task run logs after completion
-sqlite3 /Users/allenharper/bastionclaw/store/messages.db \
+sqlite3 store/messages.db \
   "SELECT run_at, duration_ms, status, substr(result,1,200) FROM task_run_logs WHERE task_id = 'refresh-insights-cron' ORDER BY run_at DESC LIMIT 3"
 ```
 

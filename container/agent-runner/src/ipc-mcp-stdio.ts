@@ -566,6 +566,31 @@ server.tool(
   },
 );
 
+server.tool(
+  'dedup_insights',
+  'Run the semantic dedup pass on the host. Merges duplicate insights that are semantically similar, transferring source links to the keeper. Run this after bulk ingestion.',
+  {
+    threshold: z.number().optional().default(0.65).describe('Minimum similarity score to consider a match (0.0-1.0, default 0.65)'),
+    dry_run: z.boolean().optional().default(false).describe('Preview merges without making changes'),
+  },
+  async (args) => {
+    try {
+      const result = await sendIpcRequest({
+        type: 'dedup_insights',
+        threshold: args.threshold,
+        dryRun: args.dry_run,
+        groupFolder,
+      }, 30_000) as { ok?: boolean; output?: string; error?: string; stdout?: string }; // Host returns immediately (dedup runs in background)
+      if (result.ok) {
+        return { content: [{ type: 'text' as const, text: result.output || 'Dedup completed.' }] };
+      }
+      return { content: [{ type: 'text' as const, text: `Dedup failed: ${result.error}\n${result.stdout || ''}` }], isError: true };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `Dedup failed: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+    }
+  },
+);
+
 // Start the stdio transport
 const transport = new StdioServerTransport();
 await server.connect(transport);

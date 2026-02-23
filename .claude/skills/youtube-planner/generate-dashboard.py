@@ -8,7 +8,12 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-WORKSPACE = "/Users/allenharper/bastionclaw/workspace/group/youtube"
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
+if Path('/workspace/group').exists():
+    WORKSPACE = "/workspace/group/youtube"
+else:
+    WORKSPACE = str(PROJECT_ROOT / 'groups' / 'main' / 'youtube')
 
 
 def parse_timestamp(filename):
