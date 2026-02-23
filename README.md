@@ -136,8 +136,8 @@ BastionClaw includes a built-in web control panel that starts automatically alon
 | Group | Tabs | Purpose |
 |-------|------|---------|
 | **Chat** | Chat | Send messages to your agent directly from the browser. Spawns a container and streams the response in real-time via WebSocket. |
-| **Dashboard** | Overview, Channels | System stats (uptime, queue depth, message counts) and channel health status. |
-| **Operations** | Groups, Messages, Tasks, Sessions | Manage registered groups, browse message history, control scheduled tasks (pause/resume/delete), view active sessions. |
+| **Dashboard** | Overview, Channels, Memory | System stats (uptime, queue depth, message counts), channel health status, and semantic memory index with collection browser and search. |
+| **Operations** | Insights, YouTube, Groups, Messages, Tasks, Sessions | Insights ranked by corroboration (optional), YouTube source dashboard with VPH tracking (optional), registered groups, message history, scheduled tasks (pause/resume/delete), and active sessions. |
 | **System** | Skills, Config, Logs, Debug | Full CRUD for skills, CLAUDE.md editor with per-group scope selector, in-memory log viewer with level filters, and system diagnostics (queue state, DB stats, process info). |
 
 ### How it works
@@ -158,7 +158,7 @@ The port can be changed with the `WEBUI_PORT` environment variable (default: `31
 
 ## Data to Wisdom Pipeline
 
-BastionClaw turns raw content into actionable knowledge through a four-stage pipeline:
+Optionally, BastionClaw turns raw content into actionable knowledge through a four-stage pipeline:
 
 1. **Data** — Monitor YouTube channels, ingest articles, PDFs, and podcasts. The system pulls transcripts and metadata automatically.
 2. **Insights** — An AI agent extracts 10-15 generalizable principles per source, each with category, context quote, and timestamp attribution.
@@ -168,6 +168,8 @@ BastionClaw turns raw content into actionable knowledge through a four-stage pip
 <p align="center">
   <img src="docs/data-to-wisdom-pipeline.png" alt="Data to Wisdom Pipeline" width="600">
 </p>
+
+To enable the pipeline, run `/ingest` to add individual sources or `/refresh-insights` to set up YouTube channel monitoring with scheduled tasks that automatically fetch new videos and extract insights on a recurring basis.
 
 ## Usage
 
