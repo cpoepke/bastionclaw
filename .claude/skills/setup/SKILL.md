@@ -604,11 +604,27 @@ launchctl list | grep bastionclaw
 
 #### Linux (systemd user service)
 
-Generate the systemd unit file:
+Generate the systemd unit file. First check if the docker group is stale (user was added mid-session but hasn't re-logged):
 
 ```bash
 NODE_PATH=$(which node)
 PROJECT_PATH=$(pwd)
+
+# Check if docker group is stale (user is in group but current session doesn't have it)
+DOCKER_STALE=false
+if groups | grep -qv docker && id -nG | grep -q docker 2>/dev/null; then
+  DOCKER_STALE=true
+elif getent group docker | grep -q "$(whoami)" && ! groups | grep -q docker; then
+  DOCKER_STALE=true
+fi
+
+if [ "$DOCKER_STALE" = true ]; then
+  EXEC_START="sg docker -c \"${NODE_PATH} ${PROJECT_PATH}/dist/index.js\""
+  echo "⚠️  Docker group was added mid-session — wrapping ExecStart with sg docker"
+  echo "   For a permanent fix, log out and back in (or reboot)."
+else
+  EXEC_START="${NODE_PATH} ${PROJECT_PATH}/dist/index.js"
+fi
 
 mkdir -p ~/.config/systemd/user
 
@@ -621,7 +637,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=${PROJECT_PATH}
-ExecStart=${NODE_PATH} ${PROJECT_PATH}/dist/index.js
+ExecStart=${EXEC_START}
 Restart=on-failure
 RestartSec=5
 StandardOutput=append:${PROJECT_PATH}/logs/bastionclaw.log
