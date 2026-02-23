@@ -14,6 +14,7 @@ For more support and information about this repo, join the free mentoring of [Dr
 **BastionClaw** (formerly NanoClaw Hard Shell) is a fork of [NanoClaw](https://github.com/qwibitai/nanoclaw), an awesome lightweight personal Claude assistant. This fork makes the following changes:
 
 - **Telegram by default** — Uses Telegram Bot API (via Grammy) instead of WhatsApp as the primary channel
+- **WhatsApp sender allowlist** — Restricts which phone numbers can trigger the bot on WhatsApp, preventing unauthorized users in shared groups from activating the agent under your identity
 - **Web control panel** — Built-in Fastify + Lit web UI for monitoring, chat, and management
 - **Cybersecurity hardening** — Additional tooling and configuration for security research workflows
 
@@ -35,6 +36,7 @@ I needed a personal Claude assistant tailored for cybersecurity work. NanoClaw's
 
 - **Telegram-first setup** — Official bot API is more reliable than WhatsApp's unofficial library, and better suited for automated workflows
 - **Web control panel** — Full browser-based UI for monitoring agent sessions, managing tasks, viewing logs, querying the qmd semantic memory system, and chatting directly with the agent without needing a phone
+- **WhatsApp sender allowlist** — Unlike Telegram (where only your bot receives messages), WhatsApp links as your personal account — anyone in your groups who types the trigger word activates the agent as you. `WHATSAPP_ALLOWED_SENDERS` restricts which phone numbers can trigger the bot while still storing all messages as conversation context
 - **Security cherry-picks** — Backported upstream security PRs (CPU/memory limits, secret sanitization, per-group IPC namespaces, mount allowlist) to harden the fork for sensitive workflows like penetration testing and threat analysis
 - **Semantic memory + insight engine** — Long-term memory powered by hybrid search (BM25 + vector embeddings) running fully local with GGUF models. Optional Data-to-Wisdom pipeline ingests YouTube videos, articles, and PDFs, extracts generalizable insights, deduplicates semantically across sources, and surfaces corroborated patterns
 - **Windows + Docker support** — Full WSL2 setup guide with Docker/Podman as container runtime alternatives to Apple Container

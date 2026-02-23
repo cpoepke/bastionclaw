@@ -53,6 +53,16 @@ export const TRIGGER_PATTERN = new RegExp(
   'i',
 );
 
+// WhatsApp sender allowlist: only these phone numbers can trigger the bot (empty = all allowed)
+export const WHATSAPP_ALLOWED_SENDERS: Set<string> = (() => {
+  const raw = process.env.WHATSAPP_ALLOWED_SENDERS || '';
+  const numbers = raw
+    .split(',')
+    .map((s) => s.replace(/[+\s-]/g, '').trim())
+    .filter(Boolean);
+  return new Set(numbers);
+})();
+
 // Timezone for scheduled tasks (cron expressions, etc.)
 // Uses system timezone by default
 export const TIMEZONE =

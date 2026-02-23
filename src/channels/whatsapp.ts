@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 import makeWASocket, {
+  Browsers,
   DisconnectReason,
   WASocket,
   makeCacheableSignalKeyStore,
@@ -62,7 +63,7 @@ export class WhatsAppChannel implements Channel {
       },
       printQRInTerminal: false,
       logger,
-      browser: ['BastionClaw', 'Chrome', '1.0.0'],
+      browser: Browsers.macOS('Chrome'),
     });
 
     this.sock.ev.on('connection.update', (update) => {

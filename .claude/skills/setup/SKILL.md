@@ -192,13 +192,18 @@ curl -s "https://api.telegram.org/bot${TOKEN}/getMe" | grep -q '"ok":true' && ec
 **IMPORTANT:** Run this command in the **foreground**. The QR code is multi-line ASCII art that must be displayed in full. Do NOT run in background or truncate the output.
 
 Tell the user:
-> A QR code will appear below. On your phone:
+> A QR code will appear in your browser. On your phone:
 > 1. Open WhatsApp
 > 2. Tap **Settings → Linked Devices → Link a Device**
-> 3. Scan the QR code
+> 3. Scan the QR code displayed in the browser
 
 Run with a long Bash tool timeout (120000ms) so the user has time to scan. Do NOT use the `timeout` shell command (it's not available on macOS).
 
+```bash
+npm run auth:browser
+```
+
+If the browser method fails, fall back to terminal QR:
 ```bash
 npm run auth
 ```
@@ -206,6 +211,51 @@ npm run auth
 Wait for the script to output "Successfully authenticated" then continue.
 
 If it says "Already authenticated", skip to the next step.
+
+### 5b. Configure Allowed Senders (WhatsApp Security)
+
+**Only show this section if the user chose WhatsApp.**
+
+Explain the security difference and use `AskUserQuestion`:
+
+> **WhatsApp security note:** Unlike Telegram (where only your bot receives messages), WhatsApp links as your personal account. This means **anyone in your groups** who types the trigger word can activate the agent — it looks like a message from you.
+>
+> How do you want to handle this?
+
+Options:
+1. **Restrict to specific numbers (Recommended)** — Only messages from phone numbers you specify will trigger the bot
+2. **Allow all senders** — Anyone in your groups can trigger the bot
+
+**If they choose "Restrict":**
+
+Ask for their phone number(s):
+> Enter the phone number(s) that should be allowed to trigger the bot.
+>
+> Use international format without `+`, spaces, or dashes (e.g. `19195612265` for US +1-919-561-2265).
+>
+> For multiple numbers, separate with commas.
+
+Write to `.env` and sync:
+```bash
+echo "WHATSAPP_ALLOWED_SENDERS=<numbers>" >> .env
+cp .env data/env/env
+```
+
+**If they choose "Allow all":**
+
+No action needed — the bot will respond to any sender. You can add `WHATSAPP_ALLOWED_SENDERS` later.
+
+### 5c. Post-Pairing Interaction Guide (WhatsApp)
+
+**Only show this section if the user chose WhatsApp.**
+
+Tell the user:
+> **How WhatsApp interaction works:**
+>
+> - **Main channel** (your primary chat): No prefix needed — just type your message and the agent will respond
+> - **Other groups**: Start your message with `@ASSISTANT_NAME` (e.g. `@Andy summarize this conversation`)
+> - **Important**: The bot responds **as you** — it's a linked device on your WhatsApp account, not a separate bot. Everyone in the chat sees the response as coming from your number.
+> - Messages from non-allowed senders (if you configured the allowlist) are still stored as conversation context — they just won't trigger the agent
 
 ## 6. Configure Assistant Name and Main Channel
 
@@ -613,9 +663,13 @@ Tell the user (using the assistant name they configured):
 > **Tip:** In your main channel (DM with bot), you don't need the `@` prefix — just send `hello` and the agent will respond. In groups, use `@ASSISTANT_NAME hello` or @mention the bot.
 
 **For WhatsApp:**
-> Send `@ASSISTANT_NAME hello` in your registered chat.
+> Send a message in your registered chat.
 >
-> **Tip:** In your main channel, you don't need the `@` prefix — just send `hello` and the agent will respond.
+> **Tips:**
+> - In your main channel, just send `hello` — no prefix needed
+> - In other groups, use `@ASSISTANT_NAME hello`
+> - If you configured `WHATSAPP_ALLOWED_SENDERS`, make sure you're sending from an allowed number
+> - The response will appear as if sent by you (linked device behavior)
 
 Check the logs:
 ```bash

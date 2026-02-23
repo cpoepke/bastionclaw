@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 
 import {
+  WHATSAPP_ALLOWED_SENDERS,
   ASSISTANT_NAME,
   DATA_DIR,
   IDLE_TIMEOUT,
@@ -146,28 +147,38 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
 
   if (missedMessages.length === 0) return true;
 
+  // Filter by sender allowlist — only applies to WhatsApp (numeric sender IDs)
+  const filteredMessages = WHATSAPP_ALLOWED_SENDERS.size > 0
+    ? missedMessages.filter((m) => {
+        const id = m.sender.split('@')[0];
+        return !/^\d+$/.test(id) || WHATSAPP_ALLOWED_SENDERS.has(id);
+      })
+    : missedMessages;
+
+  if (filteredMessages.length === 0) return true;
+
   // For non-main groups, check if trigger is required and present
   if (!isMainGroup && group.requiresTrigger !== false) {
-    const hasTrigger = missedMessages.some((m) =>
+    const hasTrigger = filteredMessages.some((m) =>
       TRIGGER_PATTERN.test(m.content.trim()),
     );
     if (!hasTrigger) return true;
   }
 
-  const prompt = formatMessages(missedMessages);
+  const prompt = formatMessages(filteredMessages);
 
   // Advance cursor so the piping path in startMessageLoop won't re-fetch
   // these messages. Save the old cursor so we can roll back on error.
   const previousCursor = lastAgentTimestamp[chatJid] || '';
   lastAgentTimestamp[chatJid] =
-    missedMessages[missedMessages.length - 1].timestamp;
+    filteredMessages[filteredMessages.length - 1].timestamp;
   saveState();
 
   logger.info(
     {
       group: group.name,
-      messageCount: missedMessages.length,
-      prompt: missedMessages[0]?.content,
+      messageCount: filteredMessages.length,
+      prompt: filteredMessages[0]?.content,
     },
     'Processing messages',
   );
@@ -372,11 +383,20 @@ async function startMessageLoop(): Promise<void> {
           const isMainGroup = group.folder === MAIN_GROUP_FOLDER;
           const needsTrigger = !isMainGroup && group.requiresTrigger !== false;
 
+          // Filter by sender allowlist — only applies to WhatsApp (numeric sender IDs)
+          const allowed = WHATSAPP_ALLOWED_SENDERS.size > 0
+            ? groupMessages.filter((m) => {
+                const id = m.sender.split('@')[0];
+                return !/^\d+$/.test(id) || WHATSAPP_ALLOWED_SENDERS.has(id);
+              })
+            : groupMessages;
+          if (allowed.length === 0) continue;
+
           // For non-main groups, only act on trigger messages.
           // Non-trigger messages accumulate in DB and get pulled as
           // context when a trigger eventually arrives.
           if (needsTrigger) {
-            const hasTrigger = groupMessages.some((m) =>
+            const hasTrigger = allowed.some((m) =>
               TRIGGER_PATTERN.test(m.content.trim()),
             );
             if (!hasTrigger) continue;
