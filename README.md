@@ -158,6 +158,8 @@ The port can be changed with the `WEBUI_PORT` environment variable (default: `31
 
 ## Data to Wisdom Pipeline
 
+[![Data to Wisdom Pipeline](https://img.youtube.com/vi/ZbeXp3EVd8U/maxresdefault.jpg)](https://youtu.be/ZbeXp3EVd8U)
+
 Optionally, BastionClaw turns raw content into actionable knowledge through a four-stage pipeline:
 
 1. **Data** — Monitor YouTube channels, ingest articles, PDFs, and podcasts. The system pulls transcripts and metadata automatically.
