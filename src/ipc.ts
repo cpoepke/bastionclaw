@@ -90,14 +90,20 @@ export function startIpcWatcher(deps: IpcDeps): void {
                   isMain ||
                   (targetGroup && targetGroup.folder === sourceGroup)
                 ) {
-                  await deps.sendMessage(
-                    data.chatJid,
-                    `${ASSISTANT_NAME}: ${data.text}`,
-                  );
-                  logger.info(
-                    { chatJid: data.chatJid, sourceGroup },
-                    'IPC message sent',
-                  );
+                  // Strip <internal>...</internal> blocks — agent reasoning not for end users
+                  const text = data.text.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
+                  if (!text) {
+                    logger.debug({ chatJid: data.chatJid, sourceGroup }, 'IPC message suppressed (internal-only)');
+                  } else {
+                    await deps.sendMessage(
+                      data.chatJid,
+                      `${ASSISTANT_NAME}: ${text}`,
+                    );
+                    logger.info(
+                      { chatJid: data.chatJid, sourceGroup },
+                      'IPC message sent',
+                    );
+                  }
                 } else {
                   logger.warn(
                     { chatJid: data.chatJid, sourceGroup },
