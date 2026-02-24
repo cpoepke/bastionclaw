@@ -81,6 +81,19 @@ function buildVolumeMounts(
       readonly: true,
     });
 
+    // Shadow .env inside the project mount to prevent secret leakage.
+    // The project root bind mount exposes .env (contains OAuth tokens, API keys).
+    // Mounting /dev/null over it makes it appear empty and read-only.
+    // Secrets are passed securely via stdin instead (see readSecrets()).
+    const envFile = path.join(projectRoot, '.env');
+    if (fs.existsSync(envFile)) {
+      mounts.push({
+        hostPath: '/dev/null',
+        containerPath: '/workspace/project/.env',
+        readonly: true,
+      });
+    }
+
     // Main also gets its group folder as the working directory
     mounts.push({
       hostPath: path.join(GROUPS_DIR, group.folder),
@@ -96,7 +109,6 @@ function buildVolumeMounts(
     });
 
     // Global memory directory (read-only for non-main)
-    // Apple Container only supports directory mounts, not file mounts
     const globalDir = path.join(GROUPS_DIR, 'global');
     if (fs.existsSync(globalDir)) {
       mounts.push({
@@ -230,12 +242,10 @@ function buildContainerArgs(mounts: VolumeMount[], containerName: string): strin
 
   for (const mount of mounts) {
     if (runtime === 'container') {
-      // Apple Container: --mount for readonly, -v for read-write
+      // Apple Container: -v for all mounts (supports both files and directories).
+      // --mount only supports directories, so we use -v universally with :ro suffix.
       if (mount.readonly) {
-        args.push(
-          '--mount',
-          `type=bind,source=${mount.hostPath},target=${mount.containerPath},readonly`,
-        );
+        args.push('-v', `${mount.hostPath}:${mount.containerPath}:ro`);
       } else {
         args.push('-v', `${mount.hostPath}:${mount.containerPath}`);
       }
