@@ -85,6 +85,13 @@ class MessageStream {
     this.waiting?.();
   }
 
+  /** Return texts of any messages still in the queue (pushed but not consumed by SDK). */
+  getRemainingTexts(): string[] {
+    return this.queue
+      .map(m => typeof m.message.content === 'string' ? m.message.content : '')
+      .filter(Boolean);
+  }
+
   async *[Symbol.asyncIterator](): AsyncGenerator<SDKUserMessage> {
     while (true) {
       while (this.queue.length > 0) {
@@ -365,13 +372,15 @@ async function runQuery(
   containerInput: ContainerInput,
   sdkEnv: Record<string, string | undefined>,
   resumeAt?: string,
-): Promise<{ newSessionId?: string; lastAssistantUuid?: string; closedDuringQuery: boolean; timedOut: boolean; messages: ParsedMessage[] }> {
+): Promise<{ newSessionId?: string; lastAssistantUuid?: string; closedDuringQuery: boolean; timedOut: boolean; messages: ParsedMessage[]; pendingMessages: string[] }> {
   const stream = new MessageStream();
   stream.push(prompt);
 
   // Poll IPC for follow-up messages and _close sentinel during the query
   let ipcPolling = true;
   let closedDuringQuery = false;
+  let resultReceived = false;
+  const lateMessages: string[] = []; // Messages drained after result was received
   const pollIpcDuringQuery = () => {
     if (!ipcPolling) return;
     if (shouldClose()) {
@@ -383,9 +392,16 @@ async function runQuery(
     }
     const messages = drainIpcInput();
     for (const text of messages) {
-      log(`Piping IPC message into active query (${text.length} chars)`);
-      capturedMessages.push({ role: 'user', content: text });
-      stream.push(text);
+      if (resultReceived) {
+        // Result already fired — don't push to stream (SDK won't process it).
+        // Collect for the next query round instead.
+        log(`Collected late IPC message for next round (${text.length} chars)`);
+        lateMessages.push(text);
+      } else {
+        log(`Piping IPC message into active query (${text.length} chars)`);
+        capturedMessages.push({ role: 'user', content: text });
+        stream.push(text);
+      }
     }
     setTimeout(pollIpcDuringQuery, IPC_POLL_MS);
   };
@@ -495,6 +511,7 @@ async function runQuery(
 
     if (message.type === 'result') {
       resultCount++;
+      resultReceived = true;
       const textResult = 'result' in message ? (message as { result?: string }).result : null;
       // When the agent writes text then does a final tool call (e.g. closing the
       // browser), the result event has no text. Fall back to the last assistant
@@ -519,8 +536,17 @@ async function runQuery(
   }
 
   ipcPolling = false;
+
+  // Collect messages that were pushed to the stream but never consumed by the SDK
+  // (race condition: pushed after result fired but before stream.end() took effect)
+  const streamRemaining = stream.getRemainingTexts();
+  const pendingMessages = [...streamRemaining, ...lateMessages];
+  if (pendingMessages.length > 0) {
+    log(`Carrying over ${pendingMessages.length} unprocessed message(s) to next round`);
+  }
+
   log(`Query done. Messages: ${messageCount}, results: ${resultCount}, lastAssistantUuid: ${lastAssistantUuid || 'none'}, closedDuringQuery: ${closedDuringQuery}`);
-  return { newSessionId, lastAssistantUuid, closedDuringQuery, timedOut, messages: capturedMessages };
+  return { newSessionId, lastAssistantUuid, closedDuringQuery, timedOut, messages: capturedMessages, pendingMessages };
 }
 
 async function main(): Promise<void> {
@@ -607,6 +633,16 @@ async function main(): Promise<void> {
 
       // Emit session update so host can track it
       writeOutput({ status: 'success', result: null, newSessionId: sessionId });
+
+      // If there are pending messages from the previous query (race condition:
+      // IPC messages drained after the SDK result fired), use them immediately
+      // instead of waiting for new IPC input.
+      if (queryResult.pendingMessages.length > 0) {
+        const pending = queryResult.pendingMessages.join('\n');
+        log(`Processing ${queryResult.pendingMessages.length} carried-over message(s) (${pending.length} chars)`);
+        prompt = pending;
+        continue;
+      }
 
       log('Query ended, waiting for next IPC message...');
 

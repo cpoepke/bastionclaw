@@ -62,6 +62,29 @@ let whatsapp: WhatsAppChannel;
 const channels: Channel[] = [];
 const queue = new GroupQueue();
 
+// Shared typing interval management — tracks per-chat typing indicator timers
+// so both processGroupMessages and the piped-message path in messageLoop can
+// start/stop typing without scoping issues.
+const typingIntervals = new Map<string, ReturnType<typeof setInterval>>();
+
+function startTypingInterval(chatJid: string, channel: Channel): void {
+  clearTypingInterval(chatJid);
+  if (channel.setTyping) {
+    typingIntervals.set(
+      chatJid,
+      setInterval(() => channel.setTyping!(chatJid, true), 4000),
+    );
+  }
+}
+
+function clearTypingInterval(chatJid: string): void {
+  const existing = typingIntervals.get(chatJid);
+  if (existing) {
+    clearInterval(existing);
+    typingIntervals.delete(chatJid);
+  }
+}
+
 function loadState(): void {
   lastTimestamp = getRouterState('last_timestamp') || '';
   const agentTs = getRouterState('last_agent_timestamp');
@@ -196,10 +219,9 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
 
   const channel = findChannel(channels, chatJid);
   // Telegram typing indicators expire after ~5s, so re-send periodically
-  let typingInterval: ReturnType<typeof setInterval> | null = null;
   if (channel?.setTyping) {
     await channel.setTyping(chatJid, true);
-    typingInterval = setInterval(() => channel.setTyping!(chatJid, true), 4000);
+    startTypingInterval(chatJid, channel);
   }
   let hadError = false;
   let outputSentToUser = false;
@@ -210,16 +232,31 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       const raw = typeof result.result === 'string' ? result.result : JSON.stringify(result.result);
       // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
       const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
-      logger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
+      logger.info({ group: group.name, hasChannel: !!channel, textLen: text.length }, `Agent output: ${raw.slice(0, 200)}`);
       if (text && channel) {
         const formatted = formatOutbound(channel, text);
-        if (formatted) await channel.sendMessage(chatJid, formatted);
+        if (formatted) {
+          try {
+            await channel.sendMessage(chatJid, formatted);
+          } catch (err) {
+            logger.error({ group: group.name, chatJid, err }, 'Failed to send agent output');
+          }
+        } else {
+          logger.warn({ group: group.name }, 'formatOutbound returned empty');
+        }
         outputSentToUser = true;
+      } else if (!channel) {
+        logger.warn({ group: group.name }, 'No channel found for agent output');
       }
+      // Clear typing indicator after sending a response
+      clearTypingInterval(chatJid);
+      if (channel?.setTyping) channel.setTyping(chatJid, false).catch(() => {});
       // Only reset idle timer on actual results, not session-update markers (result: null)
       resetIdleTimer();
     } else if (result.status !== 'error') {
-      // Null result = agent query/turn completed (waiting for next input)
+      // Null result = agent query/turn completed (waiting for next input).
+      // Do NOT clear typing here — agent may still be working on piped messages
+      // or starting a new query round. Typing clears when output is sent or container exits.
       logger.info({ group: group.name }, 'Agent query completed');
       queue.notifyIdle(chatJid);
     }
@@ -229,7 +266,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     }
   });
 
-  if (typingInterval) clearInterval(typingInterval);
+  clearTypingInterval(chatJid);
   if (channel?.setTyping) await channel.setTyping(chatJid, false);
   if (idleTimer) clearTimeout(idleTimer);
 
@@ -421,10 +458,13 @@ async function startMessageLoop(): Promise<void> {
             lastAgentTimestamp[chatJid] =
               messagesToSend[messagesToSend.length - 1].timestamp;
             saveState();
-            // Show typing indicator while the container processes the piped message
-            // (Telegram indicators expire after ~5s, so this is best-effort)
+            // Restart typing interval for piped messages (previous one
+            // may have been cleared when the last response was sent)
             const ch = findChannel(channels, chatJid);
-            if (ch?.setTyping) await ch.setTyping(chatJid, true);
+            if (ch?.setTyping) {
+              await ch.setTyping(chatJid, true);
+              startTypingInterval(chatJid, ch);
+            }
           } else {
             // No active container — enqueue for a new one
             queue.enqueueMessageCheck(chatJid);
