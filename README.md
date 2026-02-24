@@ -43,6 +43,16 @@ I needed a personal Claude assistant tailored for cybersecurity work. NanoClaw's
 
 The upstream project's philosophy of "skills over features" means these customizations stay clean and maintainable.
 
+## Sister Project: Mission Control
+
+<p align="center">
+  <a href="https://github.com/harperaa/bastionclaw-mission-control">
+    <img src="assets/mission-control.png" alt="BastionClaw Mission Control" width="600">
+  </a>
+</p>
+
+[**BastionClaw Mission Control**](https://github.com/harperaa/bastionclaw-mission-control) — A real-time command center for managing autonomous agents and task queues. Built with Convex, React, and Tailwind CSS, it provides a kanban-style mission queue, live agent roster with status indicators, document preview with full markdown rendering, and per-agent configuration with custom system prompts and personas. Integrates with BastionClaw for automatic task tracking with real-time lifecycle events.
+
 ## Quick Start
 
 ### macOS / Linux

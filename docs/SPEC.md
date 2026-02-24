@@ -155,7 +155,6 @@ bastionclaw/
 │
 ├── data/                          # Application state (gitignored)
 │   ├── sessions/                  # Per-group session data (.claude/ dirs with JSONL transcripts)
-│   ├── env/env                    # Copy of .env for container mounting
 │   └── ipc/                       # Container IPC (messages/, tasks/)
 │
 ├── logs/                          # Runtime logs (gitignored)
@@ -223,7 +222,7 @@ registerGroup("1234567890@g.us", {
 
 Additional mounts appear at `/workspace/extra/{containerPath}` inside the container.
 
-**Apple Container mount syntax note:** Read-write mounts use `-v host:container`, but readonly mounts require `--mount "type=bind,source=...,target=...,readonly"` (the `:ro` suffix doesn't work).
+**Apple Container mount syntax note:** All mounts use `-v host:container` (read-write) or `-v host:container:ro` (read-only). The `--mount` flag only supports directories, so `-v` is used universally.
 
 ### Claude Authentication
 
@@ -240,7 +239,7 @@ The token can be extracted from `~/.claude/.credentials.json` if you're logged i
 ANTHROPIC_API_KEY=sk-ant-api03-...
 ```
 
-Only the authentication variables (`CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_API_KEY`) are extracted from `.env` and written to `data/env/env`, then mounted into the container at `/workspace/env-dir/env` and sourced by the entrypoint script. This ensures other environment variables in `.env` are not exposed to the agent. This workaround is needed because Apple Container loses `-e` environment variables when using `-i` (interactive mode with piped stdin).
+Allowed secrets (`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `TRANSCRIPT_API_KEY`) are read from `.env` by the host, filtered to an allowlist, and passed to the container via stdin JSON. The agent-runner merges them into the Claude SDK environment so Bash tool calls inherit them. Secrets are never written to disk or mounted as files.
 
 ### Changing the Assistant Name
 
@@ -587,7 +586,7 @@ Inbound messages could contain malicious instructions attempting to manipulate C
 | Credential | Storage Location | Notes |
 |------------|------------------|-------|
 | Claude CLI Auth | data/sessions/{group}/.claude/ | Per-group isolation, mounted to /home/node/.claude/ |
-| Telegram Bot Token | .env / data/env/env | Set during setup, persists indefinitely |
+| Telegram Bot Token | .env | Set during setup, persists indefinitely |
 
 ### File Permissions
 

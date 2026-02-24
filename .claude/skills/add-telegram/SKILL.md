@@ -502,13 +502,7 @@ TELEGRAM_BOT_TOKEN=YOUR_BOT_TOKEN_HERE
 # TELEGRAM_ONLY=true
 ```
 
-**Important**: After modifying `.env`, sync to the container environment:
-
-```bash
-cp .env data/env/env
-```
-
-The container reads environment from `data/env/env`, not `.env` directly.
+Secrets from `.env` are automatically passed to containers via stdin (filtered to an allowlist). No manual sync needed.
 
 ### Step 5: Register a Telegram Chat
 
@@ -573,8 +567,7 @@ Tell the user:
 If user wants Telegram-only:
 
 1. Set `TELEGRAM_ONLY=true` in `.env`
-2. Run `cp .env data/env/env` to sync to container
-3. The WhatsApp channel is not created — only Telegram
+2. The WhatsApp channel is not created — only Telegram
 4. All services (scheduler, IPC watcher, queue, message loop) start normally
 5. Optionally remove `@whiskeysockets/baileys` dependency (but it's harmless to keep)
 
@@ -606,7 +599,7 @@ Telegram @mentions (e.g., `@andy_ai_bot`) are automatically translated: if the b
 ### Bot not responding
 
 Check:
-1. `TELEGRAM_BOT_TOKEN` is set in `.env` AND synced to `data/env/env`
+1. `TELEGRAM_BOT_TOKEN` is set in `.env`
 2. Chat is registered in SQLite (check with: `sqlite3 store/messages.db "SELECT * FROM registered_groups WHERE jid LIKE 'tg:%'"`)
 3. For non-main chats: message includes trigger pattern
 4. Service is running: `launchctl list | grep bastionclaw`

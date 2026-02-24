@@ -171,13 +171,6 @@ echo "TELEGRAM_BOT_TOKEN=<token>" >> .env
 echo "TELEGRAM_ONLY=true" >> .env
 ```
 
-Then sync to the container environment:
-
-```bash
-mkdir -p data/env
-cp .env data/env/env
-```
-
 **Verify the token works:**
 
 ```bash
@@ -235,10 +228,9 @@ Ask for their phone number(s):
 >
 > For multiple numbers, separate with commas.
 
-Write to `.env` and sync:
+Write to `.env`:
 ```bash
 echo "WHATSAPP_ALLOWED_SENDERS=<numbers>" >> .env
-cp .env data/env/env
 ```
 
 **If they choose "Allow all":**
@@ -274,7 +266,6 @@ Store their choice for use in the steps below.
 If they chose a custom name, also add it to `.env`:
 ```bash
 echo "ASSISTANT_NAME=<name>" >> .env
-cp .env data/env/env
 ```
 
 ### 6b. Explain security model and ask about main channel type
@@ -715,7 +706,7 @@ The user should receive a response in their messaging app.
 - Verify bot token: `curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe"`
 - Check that the chat ID is registered (should start with `tg:`): `sqlite3 store/messages.db "SELECT * FROM registered_groups WHERE jid LIKE 'tg:%'"`
 - For groups: ensure Group Privacy is disabled in BotFather (see step 6c)
-- Ensure `.env` is synced to container: `diff .env data/env/env`
+- Ensure `.env` has the correct values (secrets are passed to containers via stdin automatically)
 
 **Telegram bot only responds to @mentions in groups**:
 - The bot has Group Privacy enabled (default). Fix: BotFather > `/mybots` > select bot > Bot Settings > Group Privacy > Turn off

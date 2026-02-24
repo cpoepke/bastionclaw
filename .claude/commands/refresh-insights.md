@@ -120,12 +120,20 @@ sqlite3 store/messages.db "INSERT OR REPLACE INTO scheduled_tasks (id, group_fol
 3. IMMEDIATELY after all channels are fetched, update sources.json to set lookback_days to 1 (so future runs only pull the last day of videos). If the write fails because the filesystem is read-only, skip this step — it is non-critical.
 4. Find all new transcript.json files that are not yet indexed in insight_sources. For each one:
    - Check duration: read the transcript JSON, get the last segment start time. If < 120 seconds, SKIP it (it is a Short).
-   - Read the metadata and transcript
-   - You MUST extract at least 10 insights per video (target 10-15). Do NOT reduce this number for efficiency or any other reason. Each insight should be a distinct, actionable takeaway.
-   - Use add_insight for each (pass source_metadata as JSON string with author, published, viewCount, videoId)
+   - Read the FULL metadata and transcript text. Do NOT skim or summarize — read every word.
+   - Extract insights using add_insight (pass source_metadata as JSON string with author, published, viewCount, videoId)
+   - MINIMUM 10 insights per video. Target 10-15. This is a hard requirement, not a suggestion.
+   - After extracting insights for a video, COUNT how many you extracted. If fewer than 10, go back and re-read the transcript to find more. Keep extracting until you reach at least 10. Each insight should be a distinct, actionable takeaway — not filler.
    - Do NOT call search_insights or link_insight_source
-5. Run dedup using the dedup_insights MCP tool (do NOT run the python script directly — the DB is read-only in the container)
-6. Send a summary via send_message: channels fetched, new transcripts, insights extracted, shorts skipped, dedup merges.',
+5. Call the dedup_insights MCP tool and WAIT for it to return. Do NOT proceed until you have the dedup result with merge counts.
+6. Send a summary via send_message that MUST include ALL of these fields:
+   - Channels fetched (count)
+   - New videos found vs already indexed
+   - Per-video: channel name, title, duration, insight count (MUST be >= 10 each)
+   - Total new insights extracted
+   - Shorts skipped
+   - Dedup results: exact merge count and total insights remaining (from the dedup_insights response)
+   - Do NOT say dedup is running in background — you must have the actual results before sending the summary.',
   'cron',
   'SELECTED_CRON',
   NULL,
