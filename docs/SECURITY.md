@@ -18,6 +18,8 @@ Agents execute in Apple Container (lightweight Linux VMs), providing:
 - **Filesystem isolation** - Only explicitly mounted directories are visible
 - **Non-root execution** - Runs as unprivileged `node` user (uid 1000)
 - **Ephemeral containers** - Fresh environment per invocation (`--rm`)
+- **Resource limits** - CPU (2 cores), memory (512MB), process count (256 via ulimit/pids-limit)
+- **No shell interpolation** - All container commands use `execFile`/`execFileSync` (no shell invocation)
 
 This is the primary security boundary. Rather than relying on application-level permission checks, the attack surface is limited by what's mounted.
 

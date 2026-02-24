@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import path from 'path';
 
 export const ASSISTANT_NAME = process.env.ASSISTANT_NAME || 'Andy';
@@ -78,7 +78,7 @@ let _detectedRuntime: 'container' | 'docker' | null = null;
 export function getContainerRuntime(): 'container' | 'docker' {
   if (_detectedRuntime) return _detectedRuntime;
   try {
-    execSync('container --version', { stdio: 'pipe' });
+    execFileSync('container', ['--version'], { stdio: 'pipe' });
     _detectedRuntime = 'container';
   } catch {
     _detectedRuntime = 'docker';

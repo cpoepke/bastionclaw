@@ -2,7 +2,7 @@
  * Container Runner for BastionClaw
  * Spawns agent execution in Apple Container and handles IPC
  */
-import { ChildProcess, exec, spawn } from 'child_process';
+import { ChildProcess, execFile, spawn } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -237,6 +237,16 @@ function buildContainerArgs(mounts: VolumeMount[], containerName: string): strin
   // Resource limits: prevent CPU/memory exhaustion from runaway or malicious processes
   args.push('--cpus', '2', '--memory', '512M');
 
+  if (runtime === 'docker') {
+    // Docker: cgroup-based PID limit and privilege escalation prevention
+    args.push('--pids-limit', '256');
+    args.push('--security-opt', 'no-new-privileges:true');
+  } else {
+    // Apple Container: VM isolation handles privilege escalation;
+    // use ulimit for process count limit (--pids-limit not supported)
+    args.push('--ulimit', 'nproc=256:256');
+  }
+
   // Pass host timezone so scheduled tasks fire at correct local times
   args.push('-e', `TZ=${TIMEZONE}`);
 
@@ -417,7 +427,7 @@ export async function runContainerAgent(
     const killOnTimeout = () => {
       timedOut = true;
       logger.error({ group: group.name, containerName }, 'Container timeout, stopping gracefully');
-      exec(`${getContainerRuntime()} stop ${containerName}`, { timeout: 15000 }, (err) => {
+      execFile(getContainerRuntime(), ['stop', containerName], { timeout: 15000 }, (err) => {
         if (err) {
           logger.warn({ group: group.name, containerName, err }, 'Graceful stop failed, force killing');
           container.kill('SIGKILL');

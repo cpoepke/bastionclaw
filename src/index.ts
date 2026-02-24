@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -462,12 +462,12 @@ function ensureContainerSystemRunning(): void {
   if (runtime === 'container') {
     // Apple Container (macOS)
     try {
-      execSync('container system status', { stdio: 'pipe' });
+      execFileSync('container', ['system', 'status'], { stdio: 'pipe' });
       logger.debug('Apple Container system already running');
     } catch {
       logger.info('Starting Apple Container system...');
       try {
-        execSync('container system start', { stdio: 'pipe', timeout: 30000 });
+        execFileSync('container', ['system', 'start'], { stdio: 'pipe', timeout: 30000 });
         logger.info('Apple Container system started');
       } catch (err) {
         logger.error({ err }, 'Failed to start Apple Container system');
@@ -485,7 +485,7 @@ function ensureContainerSystemRunning(): void {
   } else {
     // Docker
     try {
-      execSync('docker info', { stdio: 'pipe', timeout: 10000 });
+      execFileSync('docker', ['info'], { stdio: 'pipe', timeout: 10000 });
       logger.debug('Docker daemon is running');
     } catch {
       logger.error('Docker daemon is not running');
@@ -504,7 +504,7 @@ function ensureContainerSystemRunning(): void {
   // Kill and clean up orphaned BastionClaw containers from previous runs
   try {
     if (runtime === 'container') {
-      const output = execSync('container ls --format json', {
+      const output = execFileSync('container', ['ls', '--format', 'json'], {
         stdio: ['pipe', 'pipe', 'pipe'],
         encoding: 'utf-8',
       });
@@ -514,11 +514,18 @@ function ensureContainerSystemRunning(): void {
         .map((c) => c.configuration.id);
       for (const name of orphans) {
         try {
-          execSync(`container stop ${name}`, { stdio: 'pipe', timeout: 10000 });
+          execFileSync('container', ['stop', name], { stdio: 'pipe', timeout: 10000 });
         } catch {
-          // If stop hangs, force kill via the runtime process
+          // If stop hangs, force kill via launchctl process lookup (no shell interpolation)
           try {
-            execSync(`kill -9 $(launchctl list | grep ${name} | awk '{print $1}')`, { stdio: 'pipe', timeout: 5000 });
+            const launchList = execFileSync('launchctl', ['list'], { encoding: 'utf-8', stdio: 'pipe', timeout: 5000 });
+            const pidLine = launchList.split('\n').find(l => l.includes(name));
+            if (pidLine) {
+              const pid = pidLine.trim().split(/\s+/)[0];
+              if (/^\d+$/.test(pid)) {
+                execFileSync('kill', ['-9', pid], { stdio: 'pipe', timeout: 5000 });
+              }
+            }
           } catch { /* best effort */ }
         }
       }
@@ -526,15 +533,15 @@ function ensureContainerSystemRunning(): void {
         logger.info({ count: orphans.length, names: orphans }, 'Stopped orphaned containers');
       }
     } else {
-      const output = execSync('docker ps --format "{{.Names}}" --filter "name=bastionclaw-"', {
+      const output = execFileSync('docker', ['ps', '--format', '{{.Names}}', '--filter', 'name=bastionclaw-'], {
         stdio: ['pipe', 'pipe', 'pipe'],
         encoding: 'utf-8',
       });
       const orphans = output.trim().split('\n').filter(Boolean);
       for (const name of orphans) {
         try {
-          execSync(`docker stop -t 5 ${name}`, { stdio: 'pipe', timeout: 10000 });
-          execSync(`docker rm -f ${name}`, { stdio: 'pipe', timeout: 5000 });
+          execFileSync('docker', ['stop', '-t', '5', name], { stdio: 'pipe', timeout: 10000 });
+          execFileSync('docker', ['rm', '-f', name], { stdio: 'pipe', timeout: 5000 });
         } catch { /* already stopped */ }
       }
       if (orphans.length > 0) {
