@@ -17,7 +17,6 @@ src/container-runner.ts               container/agent-runner/
     │ spawns container (auto-detects       │ runs Claude Agent SDK
     │ Apple Container or Docker)           │ with MCP servers
     │                                      │
-    ├── data/env/env ──────────────> /workspace/env-dir/env
     ├── groups/{folder} ───────────> /workspace/group
     ├── data/ipc/{folder} ────────> /workspace/ipc
     ├── data/sessions/{folder}/.claude/ ──> /home/node/.claude/ (isolated per-group)
@@ -32,7 +31,8 @@ src/container-runner.ts               container/agent-runner/
 |-----|----------|---------|
 | **Main app logs** | `logs/bastionclaw.log` | Host-side WhatsApp, routing, container spawning |
 | **Main app errors** | `logs/bastionclaw.error.log` | Host-side errors |
-| **Container run logs** | `groups/{folder}/logs/container-*.log` | Per-run: input, mounts, stderr, stdout |
+| **Container run logs** | `groups/{folder}/logs/container-*.log` | Per-run: live-streamed stderr/stdout, completion summary |
+| **Container live log** | `groups/{folder}/logs/latest.log` | Symlink to current/most-recent container log (tail -f) |
 | **Claude sessions** | `~/.claude/projects/` | Claude Code session history |
 
 ## Enabling Debug Logging
@@ -101,7 +101,6 @@ $RUNTIME run --rm --entrypoint /bin/bash bastionclaw-agent:latest -c 'ls -la /wo
 Expected structure:
 ```
 /workspace/
-├── env-dir/env           # Environment file (CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY)
 ├── group/                # Current group folder (cwd)
 ├── project/              # Project root (main channel only)
 ├── global/               # Global CLAUDE.md (non-main only)
@@ -301,13 +300,23 @@ $RUNTIME list 2>/dev/null || $RUNTIME ps 2>/dev/null
 # Look for containers named bastionclaw-{group}-{timestamp}
 ```
 
-### 2. Check processes inside the container
+### 2. Tail real-time container logs
+```bash
+# Follow live output from the running agent (fastest way to monitor)
+tail -f groups/{group_folder}/logs/latest.log
+
+# Or find a specific log file
+ls -lt groups/{group_folder}/logs/container-*.log | head -3
+```
+The `latest.log` symlink points to the current container's log file, created at spawn time. Shows stderr from the agent in real-time and a completion summary when the container exits.
+
+### 3. Check processes inside the container
 ```bash
 $RUNTIME exec bastionclaw-main-{timestamp} ps aux
 # Key processes: claude (the agent), node /tmp/dist/index.js (runner)
 ```
 
-### 3. Check IPC activity from inside the container
+### 4. Check IPC activity from inside the container
 ```bash
 # Current task state visible to the agent
 $RUNTIME exec bastionclaw-main-{timestamp} cat /workspace/ipc/current_tasks.json
@@ -316,7 +325,7 @@ $RUNTIME exec bastionclaw-main-{timestamp} cat /workspace/ipc/current_tasks.json
 ls -lt data/ipc/{group_folder}/messages/
 ```
 
-### 4. Check task execution status in DB
+### 5. Check task execution status in DB
 ```bash
 # Current task state
 sqlite3 store/messages.db "SELECT id, status, last_run, substr(last_result,1,200) FROM scheduled_tasks WHERE id = 'TASK_ID'"
@@ -325,7 +334,7 @@ sqlite3 store/messages.db "SELECT id, status, last_run, substr(last_result,1,200
 sqlite3 store/messages.db "SELECT run_at, duration_ms, status, substr(result,1,200) FROM task_run_logs WHERE task_id = 'TASK_ID' ORDER BY run_at DESC LIMIT 5"
 ```
 
-### 5. Check for new data being written (e.g. insight pipeline)
+### 6. Check for new data being written (e.g. insight pipeline)
 ```bash
 # New insight sources since a timestamp
 sqlite3 store/messages.db "SELECT title, indexed_at FROM insight_sources WHERE indexed_at >= '2026-02-22T01:00' ORDER BY indexed_at DESC"
@@ -334,12 +343,6 @@ sqlite3 store/messages.db "SELECT title, indexed_at FROM insight_sources WHERE i
 sqlite3 store/messages.db "SELECT substr(text,1,80), category, first_seen FROM insights WHERE first_seen >= '2026-02-22T01:00' ORDER BY first_seen DESC LIMIT 20"
 ```
 
-### 6. Post-execution logs
-After a container exits, a detailed log is written to:
-```
-groups/{group_folder}/logs/container-{ISO-timestamp}.log
-```
-Includes: duration, exit code, stderr, stdout, mount config (verbose when errors occur).
 
 ## Quick Diagnostic Script
 

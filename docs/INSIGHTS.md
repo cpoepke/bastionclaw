@@ -411,7 +411,7 @@ INSERT new scheduled_task ───>  Scheduler spawns fresh container
 
 **Session context accumulates across videos.** The container resumes its latest session via `resumeAt: latest`. After ~9 videos, the accumulated context exceeds the prompt limit. The script must periodically recycle the container and clear session state.
 
-**Container memory grows per query round.** The `allMessages` array in the agent-runner accumulated all messages across IPC-injected query rounds. Fixed by clearing `allMessages.length = 0` after each `exportConversationSnapshot`. Without this fix, the container OOM-kills at ~15 videos (512 MB limit).
+**Container memory grows per query round.** The `allMessages` array in the agent-runner accumulated all messages across IPC-injected query rounds. Fixed by clearing `allMessages.length = 0` after each `exportConversationSnapshot`. Without this fix, the container OOM-kills at ~15 videos (1 GB limit).
 
 **SQLite WAL reads can be stale.** A long-lived SQLite connection may not see writes from the host process due to WAL checkpointing. The script opens a fresh `sqlite3.connect()` for each check via `fresh_db()`.
 

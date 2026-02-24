@@ -26,7 +26,7 @@ This takes 2-5 seconds on Apple Silicon with Metal acceleration. Keyword-only se
 
 ## Architecture
 
-qmd runs on the **host** (not in the container). The models require ~2GB RAM and benefit from Metal GPU acceleration — resources unavailable in the 512MB container.
+qmd runs on the **host** (not in the container). The models require ~2GB RAM and benefit from Metal GPU acceleration — resources unavailable in the 1GB container.
 
 ### Why IPC Files Instead of HTTP
 

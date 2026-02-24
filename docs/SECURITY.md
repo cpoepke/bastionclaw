@@ -18,7 +18,7 @@ Agents execute in Apple Container (lightweight Linux VMs), providing:
 - **Filesystem isolation** - Only explicitly mounted directories are visible
 - **Non-root execution** - Runs as unprivileged `node` user (uid 1000)
 - **Ephemeral containers** - Fresh environment per invocation (`--rm`)
-- **Resource limits** - CPU (2 cores), memory (512MB), process count (256 via ulimit/pids-limit)
+- **Resource limits** - CPU (2 cores), memory (1GB), process count (256 via ulimit/pids-limit)
 - **No shell interpolation** - All container commands use `execFile`/`execFileSync` (no shell invocation)
 
 This is the primary security boundary. Rather than relying on application-level permission checks, the attack surface is limited by what's mounted.
@@ -77,12 +77,12 @@ Messages and task operations are verified against group identity:
 - Any credentials matching blocked patterns
 
 **Credential Filtering:**
-Only these environment variables are exposed to containers:
+Only these environment variables are exposed to containers (passed via stdin, never written to disk):
 ```typescript
-const allowedVars = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY'];
+const allowedVars = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'TRANSCRIPT_API_KEY'];
 ```
 
-> **Note:** Anthropic credentials are mounted so that Claude Code can authenticate when the agent runs. However, this means the agent itself can discover these credentials via Bash or file operations. Ideally, Claude Code would authenticate without exposing credentials to the agent's execution environment, but I couldn't figure this out. **PRs welcome** if you have ideas for credential isolation.
+> **Note:** These credentials are passed to the Claude SDK process environment so that Claude Code can authenticate and Bash tool calls can access API keys. The agent can discover these credentials via Bash. Ideally, Claude Code would authenticate without exposing credentials to the agent's execution environment. **PRs welcome** if you have ideas for credential isolation.
 
 ## Privilege Comparison
 

@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(git tag:*), Bash(git log:*), Bash(git diff:*), Bash(git push:*), Bash(gh release:*), Bash(date:*), Read(**/SKILL.md), Read(**/README.md), Read(**/*.md), AskUserQuestion
+allowed-tools: Bash(git tag:*), Bash(git log:*), Bash(git diff:*), Bash(git push:*), Bash(git add:*), Bash(git commit:*), Bash(git status:*), Bash(gh release:*), Bash(date:*), Bash(npm version:*), Bash(cd container*), Read(**/SKILL.md), Read(**/README.md), Read(**/*.md), AskUserQuestion
 description: Create and push a new release with automatic versioning and high-quality changelog generation
 ---
 
@@ -289,7 +289,22 @@ No tags or releases were created.
 
 ---
 
-## Step 7: Create Git Tag
+## Step 7: Update Package Versions
+
+Bump `version` in both `package.json` files to match the release version, then commit:
+
+```bash
+npm version <version> --no-git-tag-version
+cd container/agent-runner && npm version <version> --no-git-tag-version && cd ../..
+git add package.json container/agent-runner/package.json
+git commit -m "Release <version>"
+```
+
+This ensures `package.json` versions stay in sync with release tags.
+
+---
+
+## Step 8: Create Git Tag
 
 Create an annotated tag with the version:
 
@@ -310,12 +325,12 @@ git tag --list 2026.02.18
 
 ---
 
-## Step 8: Push Tag to Remote
+## Step 9: Push Tag to Remote
 
-Push the tag to the remote repository:
+Push the tag and the version commit to the remote repository:
 
 ```bash
-git push origin 2026.02.18
+git push origin main 2026.02.18
 ```
 
 **Show confirmation:**
@@ -325,7 +340,7 @@ git push origin 2026.02.18
 
 ---
 
-## Step 9: Create GitHub Release
+## Step 10: Create GitHub Release
 
 Create the GitHub release with the generated changelog:
 
@@ -349,7 +364,7 @@ gh release create 2026.02.18 \
 
 ---
 
-## Step 10: Summary
+## Step 11: Summary
 
 Display final summary:
 

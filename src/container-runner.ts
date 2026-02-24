@@ -200,12 +200,17 @@ function buildVolumeMounts(
 
 /**
  * Read allowed secrets from .env for passing to the container via stdin.
- * Secrets are never written to disk or mounted as files.
+ * These are merged into the Claude SDK process environment, which means:
+ *   1. The SDK uses CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_API_KEY to authenticate.
+ *   2. Bash tool calls inherit the full env, so API keys like TRANSCRIPT_API_KEY
+ *      are available to scripts (e.g. Python) run by the agent.
+ * This is the ONLY path for secrets into containers — nothing is mounted as files.
  */
 function readSecrets(): Record<string, string> {
   const envFile = path.join(process.cwd(), '.env');
   if (!fs.existsSync(envFile)) return {};
 
+  // SDK auth + API keys needed by agent Bash tool calls
   const allowedVars = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'TRANSCRIPT_API_KEY'];
   const secrets: Record<string, string> = {};
   const content = fs.readFileSync(envFile, 'utf-8');
@@ -235,7 +240,7 @@ function buildContainerArgs(mounts: VolumeMount[], containerName: string): strin
   const args: string[] = ['run', '-i', '--rm', '--name', containerName];
 
   // Resource limits: prevent CPU/memory exhaustion from runaway or malicious processes
-  args.push('--cpus', '2', '--memory', '512M');
+  args.push('--cpus', '2', '--memory', '1G');
 
   if (runtime === 'docker') {
     // Docker: cgroup-based PID limit and privilege escalation prevention
@@ -324,6 +329,22 @@ export async function runContainerAgent(
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
+    // Create live log file for real-time monitoring (tail -f)
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const logFile = path.join(logsDir, `container-${timestamp}.log`);
+    const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+
+    logStream.write(`=== Container Live Log ===\n`);
+    logStream.write(`Started: ${new Date().toISOString()}\n`);
+    logStream.write(`Group: ${group.name}\n`);
+    logStream.write(`Container: ${containerName}\n`);
+    logStream.write(`IsMain: ${input.isMain}\n\n`);
+
+    // Symlink for convenience: groups/{folder}/logs/latest.log → this file
+    const latestLink = path.join(logsDir, 'latest.log');
+    try { fs.unlinkSync(latestLink); } catch { /* ignore */ }
+    try { fs.symlinkSync(path.basename(logFile), latestLink); } catch { /* ignore */ }
+
     onProcess(container, containerName);
 
     let stdout = '';
@@ -345,6 +366,13 @@ export async function runContainerAgent(
 
     container.stdout.on('data', (data) => {
       const chunk = data.toString();
+
+      // Write non-marker lines to live log (skip raw JSON output markers)
+      for (const line of chunk.split('\n')) {
+        if (line && !line.includes('BASTIONCLAW_OUTPUT') && !line.startsWith('{')) {
+          logStream.write(`[stdout] ${line}\n`);
+        }
+      }
 
       // Always accumulate for logging
       if (!stdoutTruncated) {
@@ -397,6 +425,7 @@ export async function runContainerAgent(
 
     container.stderr.on('data', (data) => {
       const chunk = data.toString();
+      logStream.write(chunk);
       const lines = chunk.trim().split('\n');
       for (const line of lines) {
         if (line) logger.debug({ container: group.folder }, line);
@@ -448,17 +477,11 @@ export async function runContainerAgent(
       const duration = Date.now() - startTime;
 
       if (timedOut) {
-        const ts = new Date().toISOString().replace(/[:.]/g, '-');
-        const timeoutLog = path.join(logsDir, `container-${ts}.log`);
-        fs.writeFileSync(timeoutLog, [
-          `=== Container Run Log (TIMEOUT) ===`,
-          `Timestamp: ${new Date().toISOString()}`,
-          `Group: ${group.name}`,
-          `Container: ${containerName}`,
-          `Duration: ${duration}ms`,
-          `Exit Code: ${code}`,
-          `Had Streaming Output: ${hadStreamingOutput}`,
-        ].join('\n'));
+        logStream.write(`\n=== Container Completed (TIMEOUT) ===\n`);
+        logStream.write(`Duration: ${duration}ms\n`);
+        logStream.write(`Exit Code: ${code}\n`);
+        logStream.write(`Had Streaming Output: ${hadStreamingOutput}\n`);
+        logStream.end();
 
         // Timeout after output = idle cleanup, not failure.
         // The agent already sent its response; this is just the
@@ -491,61 +514,21 @@ export async function runContainerAgent(
         return;
       }
 
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const logFile = path.join(logsDir, `container-${timestamp}.log`);
       const isVerbose = process.env.LOG_LEVEL === 'debug' || process.env.LOG_LEVEL === 'trace';
-
-      const logLines = [
-        `=== Container Run Log ===`,
-        `Timestamp: ${new Date().toISOString()}`,
-        `Group: ${group.name}`,
-        `IsMain: ${input.isMain}`,
-        `Duration: ${duration}ms`,
-        `Exit Code: ${code}`,
-        `Stdout Truncated: ${stdoutTruncated}`,
-        `Stderr Truncated: ${stderrTruncated}`,
-        ``,
-      ];
-
       const isError = code !== 0;
 
-      if (isVerbose || isError) {
-        logLines.push(
-          `=== Input ===`,
-          JSON.stringify(input, null, 2),
-          ``,
-          `=== Container Args ===`,
-          containerArgs.join(' '),
-          ``,
-          `=== Mounts ===`,
-          mounts
-            .map(
-              (m) =>
-                `${m.hostPath} -> ${m.containerPath}${m.readonly ? ' (ro)' : ''}`,
-            )
-            .join('\n'),
-          ``,
-          `=== Stderr${stderrTruncated ? ' (TRUNCATED)' : ''} ===`,
-          stderr,
-          ``,
-          `=== Stdout${stdoutTruncated ? ' (TRUNCATED)' : ''} ===`,
-          stdout,
-        );
-      } else {
-        logLines.push(
-          `=== Input Summary ===`,
-          `Prompt length: ${input.prompt.length} chars`,
-          `Session ID: ${input.sessionId || 'new'}`,
-          ``,
-          `=== Mounts ===`,
-          mounts
-            .map((m) => `${m.containerPath}${m.readonly ? ' (ro)' : ''}`)
-            .join('\n'),
-          ``,
-        );
-      }
+      // Append completion summary to live log
+      logStream.write(`\n=== Container Completed ===\n`);
+      logStream.write(`Duration: ${duration}ms\n`);
+      logStream.write(`Exit Code: ${code}\n`);
+      logStream.write(`Stdout Truncated: ${stdoutTruncated}\n`);
+      logStream.write(`Stderr Truncated: ${stderrTruncated}\n`);
 
-      fs.writeFileSync(logFile, logLines.join('\n'));
+      if (isVerbose || isError) {
+        logStream.write(`\n=== Input ===\n${JSON.stringify(input, null, 2)}\n`);
+        logStream.write(`\n=== Container Args ===\n${containerArgs.join(' ')}\n`);
+      }
+      logStream.end();
       logger.debug({ logFile, verbose: isVerbose }, 'Container log written');
 
       if (code !== 0) {

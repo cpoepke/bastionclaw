@@ -675,22 +675,27 @@ export async function processTaskIpc(
         break;
       }
 
-      // Fire-and-forget: spawn detached so it runs to completion regardless of
-      // container lifetime. Dedup can take hours on large initial ingests.
       const args = [scriptPath];
       if (data.threshold) args.push('--threshold', String(data.threshold));
       if (data.dryRun) args.push('--dry-run');
 
-      logger.info({ sourceGroup, threshold: data.threshold }, 'Spawning dedup-insights on host (fire-and-forget)');
+      logger.info({ sourceGroup, threshold: data.threshold }, 'Running dedup-insights synchronously');
       try {
-        const child = spawn('python3', args, {
-          detached: true,
-          stdio: 'ignore',
+        const output = execFileSync('python3', args, {
+          timeout: 600_000, // 10 minute timeout
+          encoding: 'utf-8',
+          maxBuffer: 10 * 1024 * 1024,
         });
-        child.unref();
-        writeIpcResponse(sourceGroup, requestId, { ok: true, output: 'Dedup started on host (running in background). Check DB for progress: SELECT count(*) FROM insights WHERE dedup_checked_at IS NOT NULL' });
+        // Extract the summary lines from the script output
+        const lines = output.trim().split('\n');
+        const summaryStart = lines.findIndex(l => l.includes('DEDUP COMPLETE'));
+        const summary = summaryStart >= 0 ? lines.slice(summaryStart).join('\n') : lines.slice(-5).join('\n');
+        writeIpcResponse(sourceGroup, requestId, { ok: true, output: summary, fullOutput: output });
       } catch (err) {
-        writeIpcResponse(sourceGroup, requestId, { ok: false, error: err instanceof Error ? err.message : String(err) });
+        const message = err instanceof Error ? err.message : String(err);
+        // execFileSync includes stdout/stderr in the error for non-zero exits
+        const stdout = (err as { stdout?: string }).stdout || '';
+        writeIpcResponse(sourceGroup, requestId, { ok: false, error: message, output: stdout });
       }
       break;
     }
