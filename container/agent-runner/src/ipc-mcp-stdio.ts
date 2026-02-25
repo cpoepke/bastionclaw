@@ -574,20 +574,32 @@ server.tool(
     dry_run: z.boolean().optional().default(false).describe('Preview merges without making changes'),
   },
   async (args) => {
-    try {
-      const result = await sendIpcRequest({
-        type: 'dedup_insights',
-        threshold: args.threshold,
-        dryRun: args.dry_run,
-        groupFolder,
-      }, 30_000) as { ok?: boolean; output?: string; error?: string; stdout?: string }; // Host returns immediately (dedup runs in background)
-      if (result.ok) {
-        return { content: [{ type: 'text' as const, text: result.output || 'Dedup completed.' }] };
+    const MAX_ATTEMPTS = 3;
+    const TIMEOUT_MS = 600_000; // 10 minutes per attempt
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const result = await sendIpcRequest({
+          type: 'dedup_insights',
+          threshold: args.threshold,
+          dryRun: args.dry_run,
+          groupFolder,
+        }, TIMEOUT_MS) as { ok?: boolean; output?: string; error?: string; stdout?: string };
+        if (result.ok) {
+          return { content: [{ type: 'text' as const, text: result.output || 'Dedup completed.' }] };
+        }
+        return { content: [{ type: 'text' as const, text: `Dedup failed: ${result.error}\n${result.stdout || ''}` }], isError: true };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const isTimeout = message.includes('timed out');
+        if (isTimeout && attempt < MAX_ATTEMPTS) {
+          console.error(`[dedup] Attempt ${attempt}/${MAX_ATTEMPTS} timed out, retrying...`);
+          continue;
+        }
+        return { content: [{ type: 'text' as const, text: `Dedup failed after ${attempt} attempt(s): ${message}` }], isError: true };
       }
-      return { content: [{ type: 'text' as const, text: `Dedup failed: ${result.error}\n${result.stdout || ''}` }], isError: true };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: `Dedup failed: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
     }
+    return { content: [{ type: 'text' as const, text: 'Dedup failed: max retries exceeded' }], isError: true };
   },
 );
 

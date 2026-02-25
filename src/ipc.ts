@@ -688,21 +688,19 @@ export async function processTaskIpc(
       if (data.threshold) args.push('--threshold', String(data.threshold));
       if (data.dryRun) args.push('--dry-run');
 
-      logger.info({ sourceGroup, threshold: data.threshold }, 'Running dedup-insights synchronously');
+      logger.info({ sourceGroup, threshold: data.threshold }, 'Running dedup-insights');
       try {
         const output = execFileSync('python3', args, {
           timeout: 600_000, // 10 minute timeout
           encoding: 'utf-8',
           maxBuffer: 10 * 1024 * 1024,
         });
-        // Extract the summary lines from the script output
         const lines = output.trim().split('\n');
         const summaryStart = lines.findIndex(l => l.includes('DEDUP COMPLETE'));
         const summary = summaryStart >= 0 ? lines.slice(summaryStart).join('\n') : lines.slice(-5).join('\n');
         writeIpcResponse(sourceGroup, requestId, { ok: true, output: summary, fullOutput: output });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        // execFileSync includes stdout/stderr in the error for non-zero exits
         const stdout = (err as { stdout?: string }).stdout || '';
         writeIpcResponse(sourceGroup, requestId, { ok: false, error: message, output: stdout });
       }
