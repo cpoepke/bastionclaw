@@ -14,6 +14,8 @@ For more support and information about this repo, join the free mentoring of [Dr
 **BastionClaw** (formerly NanoClaw Hard Shell) is a fork of [NanoClaw](https://github.com/qwibitai/nanoclaw), an awesome lightweight personal Claude assistant. This fork makes the following changes:
 
 - **Telegram by default** — Uses Telegram Bot API (via Grammy) instead of WhatsApp as the primary channel
+- **Multi-channel support** — Discord (via discord.js) and WhatsApp alongside Telegram. Run any combination simultaneously.
+- **Agent Swarm identities** — On Discord, each subagent gets its own username and avatar via webhooks. On Telegram, each gets its own bot identity in the group.
 - **WhatsApp sender allowlist** — Restricts which phone numbers can trigger the bot on WhatsApp, preventing unauthorized users in shared groups from activating the agent under your identity
 - **Web control panel** — Built-in Fastify + Lit web UI for monitoring, chat, and management
 - **Cybersecurity hardening** — Additional tooling and configuration for security research workflows
@@ -122,14 +124,14 @@ WSL2 shuts down when you close all terminal windows. To keep BastionClaw running
 
 ## What It Supports
 
-- **Telegram I/O** — Message your agent from your phone (WhatsApp also supported via `/add-whatsapp` skill)
+- **Multi-channel messaging** — Telegram (default), Discord (`/add-discord`), or WhatsApp (`/add-whatsapp`). Run one or all simultaneously.
 - **Isolated group context** — Each group has its own `CLAUDE.md` memory, isolated filesystem, and runs in its own container sandbox with only that filesystem mounted
 - **Main channel** — Your private channel (DM with bot) for admin control; every other group is completely isolated
 - **Scheduled tasks** — Recurring jobs that run the agent and can message you back
 - **Web access** — Search and fetch content
 - **Container isolation** — Agents sandboxed in Apple Container (macOS) or Docker (macOS/Linux/Windows WSL2)
-- **Agent Swarms** — Spin up teams of specialized agents that collaborate on complex tasks
-- **Optional integrations** — Add Gmail (`/add-gmail`) and more via skills
+- **Agent Swarms** — Spin up teams of specialized agents that collaborate on complex tasks. On Discord, each agent gets its own identity (username + avatar) via webhooks (`/add-discord-swarm`). On Telegram, each agent gets its own bot identity (`/add-telegram-swarm`).
+- **Optional integrations** — Add Gmail (`/add-gmail`), voice transcription (`/add-voice-transcription`), and more via skills
 - **Semantic memory** — Long-term memory powered by [qmd](https://github.com/tobi/qmd) with hybrid search (BM25 + vector + LLM reranking). Conversations are progressively indexed mid-session and archived at compaction. The agent naturally recalls past discussions without being asked. Runs fully local with GGUF models (~2GB) — no cloud APIs needed. See [docs/MEMORY.md](docs/MEMORY.md) for architecture details.
 - **Insight engine** (optional) — Ingest articles, YouTube videos, PDFs, and podcasts to extract generalizable insights. The system deduplicates semantically — when multiple independent sources express the same idea, they merge and the insight's corroboration count rises. Top insights surface the most widely-observed principles across all your content. See [docs/INSIGHTS.md](docs/INSIGHTS.md) for architecture details.
 
@@ -281,13 +283,13 @@ Issues and PRs are welcome. If your change would also benefit the upstream proje
 - Node.js 20+
 - [Claude Code](https://claude.ai/download)
 - [Apple Container](https://github.com/apple/container) (macOS) or [Docker](https://docker.com/products/docker-desktop) (macOS/Linux/Windows WSL2)
-- A Telegram account (for creating a bot via [@BotFather](https://t.me/BotFather))
+- A messaging account: Telegram ([@BotFather](https://t.me/BotFather)), Discord ([Developer Portal](https://discord.com/developers/applications)), or WhatsApp
 
 ## Architecture
 
 ```
-Channels (Telegram/WhatsApp) --> SQLite --> Polling loop --> Container (Claude Agent SDK) --> Response
-WebUI (localhost:3100)       --> REST API / WebSocket ----^
+Channels (Telegram/Discord/WhatsApp) --> SQLite --> Polling loop --> Container (Claude Agent SDK) --> Response
+WebUI (localhost:3100)                --> REST API / WebSocket ----^
 ```
 
 Single Node.js process. Agents execute in isolated Linux containers with mounted directories. Per-group message queue with concurrency control. IPC via filesystem. Built-in Fastify web server for the control panel.
@@ -295,6 +297,7 @@ Single Node.js process. Agents execute in isolated Linux containers with mounted
 Key files:
 - `src/index.ts` - Orchestrator: state, message loop, agent invocation
 - `src/channels/telegram.ts` - Telegram bot connection, send/receive
+- `src/channels/discord.ts` - Discord bot + webhook swarm identities
 - `src/ipc.ts` - IPC watcher and task processing
 - `src/router.ts` - Message formatting and outbound routing
 - `src/group-queue.ts` - Per-group queue with global concurrency limit
@@ -308,9 +311,9 @@ Key files:
 
 ## FAQ
 
-**Why Telegram and not WhatsApp/Signal/etc?**
+**Why Telegram and not WhatsApp/Discord/Signal/etc?**
 
-Telegram has an official bot API, making it the most reliable and easiest to set up. WhatsApp is also supported — run `/add-whatsapp` to add or switch to it. That's the whole point of the skills system.
+Telegram has an official bot API, making it the most reliable and easiest to set up. Discord and WhatsApp are also fully supported — run `/add-discord` or `/add-whatsapp` to add or switch channels. You can run multiple channels simultaneously. That's the whole point of the skills system.
 
 **Why Apple Container instead of Docker?**
 
