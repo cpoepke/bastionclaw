@@ -12,20 +12,68 @@ Add multi-agent swarm support to Discord. Each subagent appears as a distinct id
 
 ## Phase 0: Prerequisites
 
-Check that Discord channel is already set up:
+### Step 1: Check Discord is enabled
 
 ```bash
 # 1. discord.ts exists
-ls src/channels/discord.ts
+ls src/channels/discord.ts 2>/dev/null && echo "OK: discord.ts exists" || echo "MISSING"
 
 # 2. DISCORD_BOT_TOKEN is configured
-grep -q "DISCORD_BOT_TOKEN" .env && echo "OK: token present" || echo "MISSING: run /add-discord first"
+grep -q "DISCORD_BOT_TOKEN" .env 2>/dev/null && echo "OK: token present" || echo "MISSING"
 
 # 3. At least one dc: group is registered
-sqlite3 store/messages.db "SELECT jid, name FROM registered_groups WHERE jid LIKE 'dc:%'" | head -5
+sqlite3 store/messages.db "SELECT jid, name FROM registered_groups WHERE jid LIKE 'dc:%'" 2>/dev/null | head -5
 ```
 
-If Discord is not set up, tell the user to run `/add-discord` first and stop.
+If ANY of these checks fail, tell the user Discord isn't set up yet and run `/add-discord` first. **Stop here** — do not continue with this skill until `/add-discord` completes successfully. Then re-run these checks.
+
+### Step 2: Check for existing swarm configuration
+
+```bash
+# Discord swarm already configured?
+grep -q "DISCORD_WEBHOOK_URLS" .env 2>/dev/null && grep "DISCORD_WEBHOOK_URLS" .env | grep -qv "^#" && echo "DISCORD_SWARM=yes" || echo "DISCORD_SWARM=no"
+
+# Telegram swarm already configured?
+grep -q "TELEGRAM_BOT_POOL" .env 2>/dev/null && grep "TELEGRAM_BOT_POOL" .env | grep -qv "^#" && echo "TELEGRAM_SWARM=yes" || echo "TELEGRAM_SWARM=no"
+
+# Check if webhook code is wired up
+grep -q "WebhookClient" src/channels/discord.ts 2>/dev/null && echo "DISCORD_WEBHOOK_CODE=yes" || echo "DISCORD_WEBHOOK_CODE=no"
+
+# Check if Telegram pool code exists
+grep -q "poolApis\|initBotPool" src/channels/telegram.ts 2>/dev/null && echo "TELEGRAM_POOL_CODE=yes" || echo "TELEGRAM_POOL_CODE=no"
+```
+
+**If an existing swarm is detected (Discord OR Telegram):**
+
+AskUserQuestion with the appropriate options based on what was found:
+
+- **If Discord swarm already exists**: "You already have a Discord swarm configured with webhook URLs. What would you like to do?"
+  - **Reconfigure it** — Update the webhook URLs, team composition, or CLAUDE.md instructions
+  - **Replace it** — Remove the current config and start fresh
+  - **Cancel** — Keep the current setup as-is
+
+- **If Telegram swarm exists but no Discord swarm**: "You already have a Telegram swarm configured with bot pool tokens. What would you like to do?"
+  - **Add Discord swarm alongside it** — Both channels will have swarm support. The `sender` field in IPC already routes to the right channel (webhooks for Discord, bot pool for Telegram).
+  - **Replace Telegram swarm with Discord** — Remove Telegram bot pool config and set up Discord webhooks instead
+  - **Cancel** — Keep the current Telegram swarm only
+
+- **If both exist**: "You have swarm configured on both Discord and Telegram. What would you like to do?"
+  - **Reconfigure Discord swarm** — Update Discord webhook URLs, team, or instructions
+  - **Cancel** — Keep everything as-is
+
+If the user chooses "Cancel", stop. If they choose "Replace Telegram swarm", remove `TELEGRAM_BOT_POOL` from `.env`, remove pool code from `src/channels/telegram.ts` if present, and remove pool init from `src/index.ts` before proceeding with Discord swarm setup.
+
+### Container slot limit (important when adding alongside existing swarm)
+
+If the user is adding Discord swarm alongside an existing Telegram swarm, inform them of the concurrency constraint:
+
+> **Note:** There is a maximum of 5 concurrent container slots. Only the first 5 agents that request action will be loaded into containers — any additional agents will queue until a slot becomes available. This limit is shared across all channels, so if you have agents active on both Telegram and Discord, they draw from the same pool of 5 slots.
+>
+> Keep your total team size across all channels to 5 or fewer for best responsiveness. Larger teams still work, but extra agents wait for a slot to free up before they can take action.
+
+Present this information via AskUserQuestion to confirm the user understands before proceeding.
+
+**If no swarm exists on any channel**, proceed directly to Phase 1.
 
 ## Phase 1: Discovery (Interactive)
 
@@ -38,6 +86,8 @@ AskUserQuestion: "What are you trying to accomplish with your bot team? Describe
 
 Based on their use case, recommend a team structure.
 
+**Container slot limit:** There are a maximum of 5 concurrent container slots shared across all channels. Only the first 5 agents that request action get loaded into containers — additional agents queue until a slot frees up. Keep total team size to 5 or fewer for best responsiveness. If an existing swarm is configured on another channel, account for those agents when sizing the team.
+
 AskUserQuestion: "Based on what you described, here's what I recommend. Which team template fits best?"
 - **Software Dev Team** — Orchestrator, Architect, Developer, QA Reviewer
 - **Research Team** — Orchestrator, Researcher, Analyst, Critic
@@ -45,6 +95,8 @@ AskUserQuestion: "Based on what you described, here's what I recommend. Which te
 - **Custom** — Define your own roles
 
 Always recommend including an adversarial/reviewer role. Explain: "The reviewer's job is to actively challenge the team's output — find flaws, edge cases, and assumptions. Teams without adversarial review produce lower quality work."
+
+If the user requests more than 5 agents, warn them: "Only 5 agents can run concurrently. The first 5 to request action will be loaded into containers. Additional agents will queue and take action as slots become available. You can still configure more than 5, but expect some agents to wait."
 
 ### Step 3: Define each role
 
