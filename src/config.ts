@@ -8,6 +8,13 @@ export const SCHEDULER_POLL_INTERVAL = 5000;
 export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 export const TELEGRAM_ONLY = process.env.TELEGRAM_ONLY === 'true';
 
+export const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || '';
+export const DISCORD_ONLY = process.env.DISCORD_ONLY === 'true';
+export const DISCORD_WEBHOOK_URLS: string[] = (process.env.DISCORD_WEBHOOK_URLS || '')
+  .split(',')
+  .map((t) => t.trim())
+  .filter(Boolean);
+
 // Absolute paths needed for container mounts
 const PROJECT_ROOT = process.cwd();
 const HOME_DIR = process.env.HOME || '/Users/user';

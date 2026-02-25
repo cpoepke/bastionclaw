@@ -1,5 +1,7 @@
 # Add Parallel AI Integration
 
+**UX Rule:** Use `AskUserQuestion` for ALL interactions with the user. Never just output questions as text — always use the tool so the user gets structured prompts with selectable options.
+
 Adds Parallel AI MCP integration to BastionClaw for advanced web research capabilities.
 
 ## What This Adds
@@ -21,19 +23,11 @@ Run all steps automatically. Only pause for user input when explicitly needed.
 
 ### 1. Get Parallel AI API Key
 
-Ask the user:
-> Do you have a Parallel AI API key, or should I help you get one?
+AskUserQuestion: Do you have a Parallel AI API key?
+- **Yes, I have one** — I'll paste it next
+- **No, I need one** — Guide me through getting one from https://platform.parallel.ai
 
-**If they have one:**
-Ask them to provide it.
-
-**If they need one:**
-Tell them:
-> 1. Go to https://platform.parallel.ai
-> 2. Sign up or log in
-> 3. Navigate to API Keys section
-> 4. Create a new API key
-> 5. Copy the key and paste it here
+If they need one, walk them through: Go to https://platform.parallel.ai, sign up, navigate to API Keys, create a new key, copy and paste it.
 
 Wait for the API key.
 

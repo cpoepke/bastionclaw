@@ -202,6 +202,17 @@ From the main channel (DM with bot), you can manage groups and tasks:
 @Kia join the Family Chat group
 ```
 
+## Updating
+
+Run `/update` inside Claude Code. It fetches the latest from upstream, detects conflicts with your customizations, and helps you merge safely. A rollback tag is created before every update.
+
+```bash
+claude
+# then type: /update
+```
+
+The update skill knows which files are yours (never touched), which are shared (merged carefully), and which are framework code (replaced). See the customization zones below.
+
 ## Customizing
 
 There are no configuration files to learn. Just tell Claude Code what you want:
@@ -214,6 +225,49 @@ There are no configuration files to learn. Just tell Claude Code what you want:
 Or run `/customize` for guided changes.
 
 The codebase is small enough that Claude can safely modify it.
+
+### Customization Zones
+
+Every file in BastionClaw falls into one of three zones that determine how updates affect it.
+
+**Green Zone** — Yours. Updates never touch these.
+
+| What | Examples |
+|------|---------|
+| Secrets & config | `.env` |
+| All persistent data | `store/`, `data/`, `logs/` |
+| Group workspaces | `groups/*/` (files, insights, conversations — everything except CLAUDE.md) |
+| User-created groups | `groups/{your-groups}/` (entire directory) |
+| User-created skills | `.claude/skills/{your-skill}/` (new skill directories you add) |
+| User-created container skills | `container/skills/{your-skill}/` (new directories you add) |
+| External config | `~/.config/bastionclaw/mount-allowlist.json` |
+| YouTube sources | `.claude/skills/youtube-planner/sources.json` |
+
+**Yellow Zone** — Shared. Updates detect your edits and help you merge.
+
+| What | How Updates Handle It |
+|------|----------------------|
+| `groups/main/CLAUDE.md` | Three-way merge — your edits preserved, new sections added |
+| `groups/global/CLAUDE.md` | Same three-way merge |
+| Shipped container skills (`agent-browser`, `refresh-insights`) | Replaced unless you edited them, then merge offered |
+| Service files (launchd plist / systemd unit) | Preserved if exists |
+
+**Red Zone** — Framework. Replaced on update. Do not modify directly.
+
+| What |
+|------|
+| All TypeScript source (`src/`, `container/agent-runner/src/`) |
+| Container build files (`Dockerfile`, `build.sh`) |
+| Shipped skills (`.claude/skills/*/SKILL.md`) |
+| Slash commands (`.claude/commands/*.md`) |
+| Scripts (`scripts/`), docs (`docs/`), UI (`ui/`) |
+| `package.json`, `tsconfig.json`, root `CLAUDE.md`, `README.md` |
+
+**How to customize Red Zone behavior without editing Red Zone files:**
+- Change agent behavior → Edit `groups/main/CLAUDE.md` or `groups/global/CLAUDE.md` (Yellow Zone)
+- Add new capabilities → Create a new skill directory in `.claude/skills/` (Green Zone)
+- Change configuration → Set environment variables in `.env` (Green Zone)
+- Add container tools → Create a new directory in `container/skills/` (Green Zone)
 
 ## Contributing
 

@@ -1,6 +1,7 @@
 ---
 name: add-voice-transcription
 description: Add voice message transcription to BastionClaw using OpenAI's Whisper API. Automatically transcribes WhatsApp voice notes so the agent can read and respond to them.
+allowed-tools: Bash(*), Read, Edit, Write, Glob, Grep, AskUserQuestion
 ---
 
 # Add Voice Message Transcription

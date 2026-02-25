@@ -18,6 +18,7 @@ import readline from 'readline';
 import makeWASocket, {
   Browsers,
   DisconnectReason,
+  fetchLatestWaWebVersion,
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
 } from '@whiskeysockets/baileys';
@@ -214,8 +215,10 @@ async function authenticate(): Promise<void> {
     console.log(`Starting WhatsApp authentication (browser QR)...\n`);
   }
 
-  function connectSocket(isReconnect = false): void {
+  async function connectSocket(isReconnect = false): Promise<void> {
+    const { version } = await fetchLatestWaWebVersion({});
     const sock = makeWASocket({
+      version,
       auth: {
         creds: state.creds,
         keys: makeCacheableSignalKeyStore(state.keys, logger),

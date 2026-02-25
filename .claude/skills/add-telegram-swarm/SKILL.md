@@ -1,9 +1,12 @@
 ---
 name: add-telegram-swarm
 description: Add Agent Swarm (Teams) support to Telegram. Each subagent gets its own bot identity in the group. Requires Telegram channel to be set up first (use /add-telegram). Triggers on "agent swarm", "agent teams telegram", "telegram swarm", "bot pool".
+allowed-tools: Bash(*), Read, Edit, Write, Glob, Grep, AskUserQuestion
 ---
 
 # Add Agent Swarm to Telegram
+
+**UX Rule:** Use `AskUserQuestion` for ALL interactions with the user. Never just output questions as text — always use the tool so the user gets structured prompts with selectable options.
 
 This skill adds Agent Teams (Swarm) support to an existing Telegram channel. Each subagent in a team gets its own bot identity in the Telegram group, so users can visually distinguish which agent is speaking.
 

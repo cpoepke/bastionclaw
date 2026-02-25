@@ -28,6 +28,7 @@ import { RegisteredGroup } from './types.js';
 
 export interface IpcDeps {
   sendMessage: (jid: string, text: string) => Promise<void>;
+  sendWebhookMessage?: (jid: string, text: string, sender: string) => Promise<void>;
   registeredGroups: () => Record<string, RegisteredGroup>;
   registerGroup: (jid: string, group: RegisteredGroup) => void;
   syncGroupMetadata: (force: boolean) => Promise<void>;
@@ -94,6 +95,12 @@ export function startIpcWatcher(deps: IpcDeps): void {
                   const text = data.text.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
                   if (!text) {
                     logger.debug({ chatJid: data.chatJid, sourceGroup }, 'IPC message suppressed (internal-only)');
+                  } else if (data.sender && deps.sendWebhookMessage) {
+                    await deps.sendWebhookMessage(data.chatJid, text, data.sender);
+                    logger.info(
+                      { chatJid: data.chatJid, sourceGroup, sender: data.sender },
+                      'IPC webhook message sent',
+                    );
                   } else {
                     await deps.sendMessage(
                       data.chatJid,
@@ -188,6 +195,7 @@ export async function processTaskIpc(
     name?: string;
     folder?: string;
     trigger?: string;
+    channel?: string;
     containerConfig?: RegisteredGroup['containerConfig'];
     // For qmd request-response IPC
     requestId?: string;
@@ -413,6 +421,7 @@ export async function processTaskIpc(
           trigger: data.trigger,
           added_at: new Date().toISOString(),
           containerConfig: data.containerConfig,
+          channel: data.channel,
         });
       } else {
         logger.warn(

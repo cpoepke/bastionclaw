@@ -1,9 +1,12 @@
 ---
 name: customize
 description: Add new capabilities or modify BastionClaw behavior. Use when user wants to add channels (Telegram, Slack, email input), change triggers, add integrations, modify the router, or make any other customizations. This is an interactive skill that asks questions to understand what the user wants.
+allowed-tools: Bash(*), Read, Edit, Write, Glob, Grep, AskUserQuestion
 ---
 
 # BastionClaw Customization
+
+**UX Rule:** Use `AskUserQuestion` for ALL interactions with the user. Never just output questions as text — always use the tool so the user gets structured prompts with selectable options.
 
 This skill helps users add capabilities or modify behavior. Use AskUserQuestion to understand what they want before making changes.
 

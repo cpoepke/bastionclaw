@@ -1,13 +1,16 @@
 ---
 name: setup
 description: Run initial BastionClaw setup. Use when user wants to install dependencies, configure Telegram, register their main channel, or start the background services. Triggers on "setup", "install", "configure bastionclaw", or first-time setup requests.
+allowed-tools: Bash(*), Read, Edit, Write, Glob, Grep, AskUserQuestion
 ---
 
 # BastionClaw Setup
 
 Run all commands automatically. Only pause when user action is required (creating a bot, sending /chatid).
 
-**UX Note:** When asking the user questions, prefer using the `AskUserQuestion` tool instead of just outputting text. This integrates with Claude's built-in question/answer system for a better experience.
+**UX Rule:** Use `AskUserQuestion` for ALL interactions with the user. Never just output questions as text — always use the tool so the user gets structured prompts with selectable options.
+
+**Minimize interruptions:** Batch related questions into a single AskUserQuestion call when possible. Don't ask permission to run bash commands — the `Bash(*)` allowed-tool means all commands are pre-approved. Just run them. Only pause for things that truly require user action (pasting tokens, scanning QR codes, creating external accounts).
 
 ## 1. Install Dependencies
 
@@ -27,37 +30,28 @@ which docker && docker info >/dev/null 2>&1 && echo "Docker: installed and runni
 
 ### If NOT on macOS (Linux, etc.)
 
-Apple Container is macOS-only. Use Docker instead.
-
-Tell the user:
-> You're on Linux, so we'll use Docker for container isolation. Let me set that up now.
-
-**Use the `/convert-to-docker` skill** to convert the codebase to Docker, then continue to Section 3.
+Apple Container is macOS-only. Use Docker instead. Inform the user you'll use Docker, then use the `/convert-to-docker` skill and continue to Section 3.
 
 ### If on macOS
 
 **If Apple Container is already installed:** Continue to Section 3.
 
-**If Apple Container is NOT installed:** Ask the user:
-> BastionClaw needs a container runtime for isolated agent execution. You have two options:
->
-> 1. **Apple Container** (default) - macOS-native, lightweight, designed for Apple silicon
-> 2. **Docker** - Cross-platform, widely used, works on macOS and Linux
->
-> Which would you prefer?
+**If Apple Container is NOT installed:**
+
+AskUserQuestion: BastionClaw needs a container runtime for isolated agent execution. Which would you prefer?
+- **Apple Container** (Recommended) — macOS-native, lightweight, designed for Apple silicon
+- **Docker** — Cross-platform, widely used, works on macOS and Linux
 
 #### Option A: Apple Container
 
-Tell the user:
-> Apple Container is required for running agents in isolated environments.
->
-> 1. Download the latest `.pkg` from https://github.com/apple/container/releases
-> 2. Double-click to install
-> 3. Run `container system start` to start the service
->
-> Let me know when you've completed these steps.
+AskUserQuestion: Apple Container needs to be installed. Please complete these steps:
+1. Download the latest `.pkg` from https://github.com/apple/container/releases
+2. Double-click to install
+3. Let me know when it's done.
+- **Done, I installed it** — Continue setup
+- **I need help** — Show me more details
 
-Wait for user confirmation, then verify:
+Then verify:
 
 ```bash
 container system start
@@ -68,26 +62,19 @@ container --version
 
 #### Option B: Docker
 
-Tell the user:
-> You've chosen Docker. Let me set that up now.
-
-**Use the `/convert-to-docker` skill** to convert the codebase to Docker, then continue to Section 3.
+Use the `/convert-to-docker` skill to convert the codebase to Docker, then continue to Section 3.
 
 ## 3. Configure Claude Authentication
 
-Ask the user:
-> Do you want to use your **Claude subscription** (Pro/Max) or an **Anthropic API key**?
+AskUserQuestion: How do you want to authenticate with Claude?
+- **Claude subscription (Pro/Max)** (Recommended) — Uses your existing Claude subscription via OAuth token
+- **Anthropic API key** — Uses a pay-per-use API key from console.anthropic.com
 
 ### Option 1: Claude Subscription (Recommended)
 
-Tell the user:
-> Open another terminal window and run:
-> ```
-> claude setup-token
-> ```
-> A browser window will open for you to log in. Once authenticated, the token will be displayed in your terminal. Either:
-> 1. Paste it here and I'll add it to `.env` for you, or
-> 2. Add it to `.env` yourself as `CLAUDE_CODE_OAUTH_TOKEN=<your-token>`
+AskUserQuestion: Open another terminal and run `claude setup-token`. A browser will open for login. Once done, paste the token here.
+- **I'll paste the token** — Paste it in the "Other" field
+- **I'll add it to .env myself** — I know what I'm doing
 
 If they give you the token, add it to `.env`:
 
@@ -97,19 +84,22 @@ echo "CLAUDE_CODE_OAUTH_TOKEN=<token>" > .env
 
 ### Option 2: API Key
 
-Ask if they have an existing key to copy or need to create one.
+AskUserQuestion: Do you have an existing Anthropic API key, or do you need to create one?
+- **I have a key** — Paste it in the "Other" field
+- **I need to create one** — I'll get one from console.anthropic.com
 
-**Copy existing:**
+**If they have a key**, write it to `.env`:
 ```bash
-grep "^ANTHROPIC_API_KEY=" /path/to/source/.env > .env
+echo "ANTHROPIC_API_KEY=<key>" > .env
 ```
 
-**Create new:**
+**If they need to create one:**
 ```bash
 echo 'ANTHROPIC_API_KEY=' > .env
 ```
 
-Tell the user to add their key from https://console.anthropic.com/
+AskUserQuestion: Go to https://console.anthropic.com/, create an API key, and paste it here.
+- **I have the key** — Paste it in the "Other" field
 
 **Verify:**
 ```bash
@@ -139,28 +129,19 @@ fi
 
 ## 5. Channel Setup
 
-**Use the AskUserQuestion tool** to ask:
-
-> Which messaging channel do you want to use?
->
-> Options:
-> 1. **Telegram** (Recommended) - Easy setup, just create a bot with BotFather
-> 2. **WhatsApp** - Requires QR code scanning, uses unofficial API
+AskUserQuestion: Which messaging channel do you want to use?
+- **Telegram** (Recommended) — Easy setup, just create a bot with BotFather
+- **WhatsApp** — Requires QR code scanning, uses unofficial API
+- **Discord** — Create a Discord bot, good for team collaboration
 
 ### Option A: Telegram (Default)
 
-**USER ACTION REQUIRED**
-
-Tell the user:
-
-> I need you to create a Telegram bot:
->
-> 1. Open Telegram and search for `@BotFather`
-> 2. Send `/newbot` and follow prompts:
->    - Bot name: Something friendly (e.g., "My Assistant")
->    - Bot username: Must end with "bot" (e.g., "my_assistant_bot")
-> 3. Copy the bot token (looks like `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`)
-> 4. Paste the token here
+AskUserQuestion: I need you to create a Telegram bot. Here's how:
+1. Open Telegram and search for `@BotFather`
+2. Send `/newbot` and follow prompts (name it anything, username must end with "bot")
+3. Copy the bot token and paste it below
+- **I have the token** — Paste it in the "Other" field
+- **I need help** — Walk me through it step by step
 
 Wait for the user to provide the token.
 
@@ -184,11 +165,9 @@ curl -s "https://api.telegram.org/bot${TOKEN}/getMe" | grep -q '"ok":true' && ec
 
 **IMPORTANT:** Run this command in the **foreground**. The QR code is multi-line ASCII art that must be displayed in full. Do NOT run in background or truncate the output.
 
-Tell the user:
-> A QR code will appear in your browser. On your phone:
-> 1. Open WhatsApp
-> 2. Tap **Settings → Linked Devices → Link a Device**
-> 3. Scan the QR code displayed in the browser
+AskUserQuestion: A QR code will appear in your browser. You'll need to scan it with WhatsApp (Settings > Linked Devices > Link a Device). Ready?
+- **Yes, let's go** — Show the QR code
+- **I need help** — Explain the process in detail
 
 Run with a long Bash tool timeout (120000ms) so the user has time to scan. Do NOT use the `timeout` shell command (it's not available on macOS).
 
@@ -209,24 +188,14 @@ If it says "Already authenticated", skip to the next step.
 
 **Only show this section if the user chose WhatsApp.**
 
-Explain the security difference and use `AskUserQuestion`:
-
-> **WhatsApp security note:** Unlike Telegram (where only your bot receives messages), WhatsApp links as your personal account. This means **anyone in your groups** who types the trigger word can activate the agent — it looks like a message from you.
->
-> How do you want to handle this?
-
-Options:
-1. **Restrict to specific numbers (Recommended)** — Only messages from phone numbers you specify will trigger the bot
-2. **Allow all senders** — Anyone in your groups can trigger the bot
+AskUserQuestion: Unlike Telegram (where only your bot receives messages), WhatsApp links as your personal account. Anyone in your groups who types the trigger word can activate the agent. How do you want to handle this?
+- **Restrict to specific numbers** (Recommended) — Only messages from phone numbers you specify will trigger the bot
+- **Allow all senders** — Anyone in your groups can trigger the bot
 
 **If they choose "Restrict":**
 
-Ask for their phone number(s):
-> Enter the phone number(s) that should be allowed to trigger the bot.
->
-> Use international format without `+`, spaces, or dashes (e.g. `19195612265` for US +1-919-561-2265).
->
-> For multiple numbers, separate with commas.
+AskUserQuestion: Enter your phone number(s) in international format without `+`, spaces, or dashes (e.g. `19195612265` for US +1-919-561-2265). For multiple numbers, separate with commas.
+- **I'll paste my number(s)** — Paste in the "Other" field
 
 Write to `.env`:
 ```bash
@@ -241,66 +210,39 @@ No action needed — the bot will respond to any sender. You can add `WHATSAPP_A
 
 **Only show this section if the user chose WhatsApp.**
 
-Tell the user:
-> **How WhatsApp interaction works:**
->
-> - **Main channel** (your primary chat): No prefix needed — just type your message and the agent will respond
-> - **Other groups**: Start your message with `@ASSISTANT_NAME` (e.g. `@Andy summarize this conversation`)
-> - **Important**: The bot responds **as you** — it's a linked device on your WhatsApp account, not a separate bot. Everyone in the chat sees the response as coming from your number.
-> - Messages from non-allowed senders (if you configured the allowlist) are still stored as conversation context — they just won't trigger the agent
+AskUserQuestion: Here's how WhatsApp interaction works. Your **main channel** needs no prefix — just type and the agent responds. In **other groups**, start messages with `@ASSISTANT_NAME`. Important: the bot responds **as you** (linked device). Non-allowed senders' messages are stored as context but won't trigger the agent. Got it?
+- **Got it, continue** — Proceed to next step
+- **Tell me more** — Explain in detail
 
 ## 6. Configure Assistant Name and Main Channel
 
 This step configures three things at once: the trigger word, the main channel type, and the main channel selection.
 
-### 6a. Ask for trigger word
+### 6a. Ask for trigger word and main channel type
 
-Ask the user:
-> What trigger word do you want to use? (default: `Andy`)
->
-> In group chats, messages starting with `@TriggerWord` will be sent to the agent.
-> In your main channel (and optionally solo chats), no prefix is needed — all messages are processed.
+Collect trigger word and main channel type in one interaction:
 
-Store their choice for use in the steps below.
+AskUserQuestion: What trigger word should the agent respond to in group chats? (default: `Andy`). Messages starting with `@TriggerWord` will activate the agent. In your main channel, no prefix is needed.
+- **Andy** (Recommended) — Use the default name
+- **Custom name** — I'll type my preferred name in "Other"
 
-If they chose a custom name, also add it to `.env`:
+If they chose a custom name, add it to `.env`:
 ```bash
 echo "ASSISTANT_NAME=<name>" >> .env
 ```
 
-### 6b. Explain security model and ask about main channel type
+### 6b. Main channel type
 
-**Use the AskUserQuestion tool** to present this:
+AskUserQuestion: Your "main" channel is your admin portal — it has elevated privileges (cross-group visibility, task management, global memory, full project access). Which setup do you want?
+- **Personal chat (DM with bot)** (Recommended) — Only you have admin control
+- **Solo group (just me)** — A group with only you in it
+- **Group with other people** — Everyone in the group gets admin privileges
 
-> **Important: Your "main" channel is your admin control portal.**
->
-> The main channel has elevated privileges:
-> - Can see messages from ALL other registered groups
-> - Can manage and delete tasks across all groups
-> - Can write to global memory that all groups can read
-> - Has read-write access to the entire BastionClaw project
->
-> **Recommendation:** Use your personal DM with the bot as your main channel. This ensures only you have admin control.
->
-> **Question:** Which setup will you use for your main channel?
->
-> Options:
-> 1. Personal chat (DM with bot) - Recommended
-> 2. Solo group (just me)
-> 3. Group with other people (I understand the security implications)
+If they choose "Group with other people":
 
-If they choose option 3, ask a follow-up:
-
-> You've chosen a group with other people. This means everyone in that group will have admin privileges over BastionClaw.
->
-> Are you sure you want to proceed? The other members will be able to:
-> - Read messages from your other registered chats
-> - Schedule and manage tasks
-> - Access any directories you've mounted
->
-> Options:
-> 1. Yes, I understand and want to proceed
-> 2. No, let me use a personal chat or solo group instead
+AskUserQuestion: Everyone in that group will be able to read messages from other chats, manage tasks, and access mounted directories. Are you sure?
+- **Yes, I understand** — Proceed with shared admin access
+- **No, I'll use a personal chat** — Switch to the recommended option
 
 ### 6c. Register the main channel
 
@@ -317,31 +259,9 @@ npm run dev
 
 **For Telegram** (chose Telegram in step 5):
 
-Tell the user:
-
-> The bot is now running. To get your chat ID:
->
-> **For personal chat (DM with bot):**
-> 1. Open Telegram and search for your bot
-> 2. Start a chat and send `/chatid`
-> 3. The bot will reply with your chat ID (e.g., `tg:123456789`)
-> 4. Paste the chat ID here
->
-> **For group chat:**
-> 1. Add your bot to the group
-> 2. Send `/chatid` in the group
-> 3. The bot will reply with the group's chat ID (e.g., `tg:-1001234567890`)
-> 4. Paste the chat ID here
-
-If the user wants a group chat and needs the bot to see all messages (not just @mentions), also tell them:
-
-> **Important for group chats:** By default, Telegram bots in groups only receive messages that @mention the bot. To let the bot see all messages:
->
-> 1. Open Telegram and search for `@BotFather`
-> 2. Send `/mybots` and select your bot
-> 3. Go to **Bot Settings** > **Group Privacy**
-> 4. Select **Turn off**
-> 5. Remove and re-add the bot to the group (required for the change to take effect)
+AskUserQuestion: The bot is running briefly so we can get your chat ID. Open Telegram, find your bot (or add it to a group), and send `/chatid`. The bot will reply with the ID. For group chats, you'll also need to disable Group Privacy in BotFather (`/mybots` > Bot Settings > Group Privacy > Turn off, then remove and re-add the bot). Paste the chat ID when ready.
+- **I have the chat ID** — Paste it in the "Other" field (format: `tg:NUMBERS`)
+- **I need help** — Walk me through it step by step
 
 Wait for the user to provide the chat ID (format: `tg:NUMBERS`).
 
@@ -349,7 +269,12 @@ Wait for the user to provide the chat ID (format: `tg:NUMBERS`).
 
 **For personal chat** (they chose option 1 in 6b):
 
-Personal chats are NOT synced to the database on startup — only groups are. Instead, ask the user for their phone number (with country code, no + or spaces, e.g. `14155551234`), then construct the JID as `{number}@s.whatsapp.net`.
+Personal chats are NOT synced to the database on startup — only groups are. Ask the user for their phone number:
+
+AskUserQuestion: I need your phone number to set up the main channel. Use international format without `+`, spaces, or dashes (e.g. `14155551234`).
+- **I'll paste my number** — Paste in the "Other" field
+
+Construct the JID as `{number}@s.whatsapp.net`.
 
 **For group** (they chose option 2 or 3 in 6b):
 
@@ -358,7 +283,7 @@ Groups are synced on startup via `groupFetchAllParticipating`. Query the databas
 sqlite3 store/messages.db "SELECT jid, name FROM chats WHERE jid LIKE '%@g.us' AND jid != '__group_sync__' ORDER BY last_message_time DESC LIMIT 40"
 ```
 
-Show only the **10 most recent** group names to the user and ask them to pick one. If they say their group isn't in the list, show the next batch from the results you already have. If they tell you the group name directly, look it up:
+Show the **10 most recent** group names via AskUserQuestion and ask the user to pick one. If they say their group isn't listed, show the next batch. If they provide a name directly, look it up:
 ```bash
 sqlite3 store/messages.db "SELECT jid, name FROM chats WHERE name LIKE '%GROUP_NAME%' AND jid LIKE '%@g.us'"
 ```
@@ -402,14 +327,11 @@ mkdir -p groups/main/logs
 
 ## 7. Configure External Directory Access (Mount Allowlist)
 
-Ask the user:
-> Do you want the agent to be able to access any directories **outside** the BastionClaw project?
->
-> Examples: Git repositories, project folders, documents you want Claude to work on.
->
-> **Note:** This is optional. Without configuration, agents can only access their own group folders.
+AskUserQuestion: Do you want the agent to access directories **outside** the BastionClaw project? (e.g. Git repos, project folders, documents). Without this, agents can only access their own group folders.
+- **No, skip this** (Recommended) — Agents stay sandboxed to their group folders
+- **Yes, I want to grant access** — I'll specify which directories
 
-If **no**, create an empty allowlist to make this explicit:
+If **no**, create an empty allowlist:
 
 ```bash
 mkdir -p ~/.config/bastionclaw
@@ -425,31 +347,18 @@ echo "Mount allowlist created - no external directories allowed"
 
 Skip to the next step.
 
-If **yes**, ask follow-up questions:
+If **yes**, collect all directory info in one interaction:
 
 ### 7a. Collect Directory Paths
 
-Ask the user:
-> Which directories do you want to allow access to?
->
-> You can specify:
-> - A parent folder like `~/projects` (allows access to anything inside)
-> - Specific paths like `~/repos/my-app`
->
-> List them one per line, or give me a comma-separated list.
+AskUserQuestion: Which directories should be accessible? List them in the "Other" field (one per line or comma-separated). For each, specify read-write or read-only. Example: `~/projects (read-write), ~/docs (read-only)`. Parent folders like `~/projects` allow access to everything inside.
+- **I'll list my directories** — Type them in the "Other" field
 
-For each directory they provide, ask:
-> Should `[directory]` be **read-write** (agents can modify files) or **read-only**?
->
-> Read-write is needed for: code changes, creating files, git commits
-> Read-only is safer for: reference docs, config examples, templates
+Then ask about non-main group permissions:
 
-### 7b. Configure Non-Main Group Access
-
-Ask the user:
-> Should **non-main groups** (other chats you add later) be restricted to **read-only** access even if read-write is allowed for the directory?
->
-> Recommended: **Yes** - this prevents other groups from modifying files even if you grant them access to a directory.
+AskUserQuestion: Should non-main groups (other chats added later) be restricted to read-only even if the directory allows read-write?
+- **Yes, restrict non-main groups** (Recommended) — Prevents other groups from modifying files
+- **No, same permissions for all** — All groups get the configured access level
 
 ### 7c. Create the Allowlist
 
@@ -488,25 +397,9 @@ Verify the file:
 cat ~/.config/bastionclaw/mount-allowlist.json
 ```
 
-Tell the user:
-> Mount allowlist configured. The following directories are now accessible:
-> - `~/projects` (read-write)
-> - `~/docs` (read-only)
->
-> **Security notes:**
-> - Sensitive paths (`.ssh`, `.gnupg`, `.aws`, credentials) are always blocked
-> - This config file is stored outside the project, so agents cannot modify it
-> - Changes require restarting the BastionClaw service
->
-> To grant a group access to a directory, add it to their config in `data/registered_groups.json`:
-> ```json
-> "containerConfig": {
->   "additionalMounts": [
->     { "hostPath": "~/projects/my-app" }
->   ]
-> }
-> ```
-> The folder appears inside the container at `/workspace/extra/<folder-name>` (derived from the last segment of the path). Add `"readonly": false` for write access, or `"containerPath": "custom-name"` to override the default name.
+AskUserQuestion: Mount allowlist configured! Sensitive paths (`.ssh`, `.gnupg`, `.aws`) are always blocked. To grant a group access to a directory later, add `additionalMounts` to their config in the database. The folder appears in the container at `/workspace/extra/<folder-name>`. Ready to continue?
+- **Got it, continue** — Proceed to build and service setup
+- **Tell me more about mounts** — Explain how container mounts work
 
 ## 8. Build and Configure Service
 
@@ -662,28 +555,17 @@ systemctl --user status bastionclaw
 
 ## 9. Test
 
-Tell the user (using the assistant name they configured):
-
-**For Telegram:**
-> Send a message to your bot in Telegram.
->
-> **Tip:** In your main channel (DM with bot), you don't need the `@` prefix — just send `hello` and the agent will respond. In groups, use `@ASSISTANT_NAME hello` or @mention the bot.
-
-**For WhatsApp:**
-> Send a message in your registered chat.
->
-> **Tips:**
-> - In your main channel, just send `hello` — no prefix needed
-> - In other groups, use `@ASSISTANT_NAME hello`
-> - If you configured `WHATSAPP_ALLOWED_SENDERS`, make sure you're sending from an allowed number
-> - The response will appear as if sent by you (linked device behavior)
-
-Check the logs:
+Start tailing logs immediately:
 ```bash
 tail -f logs/bastionclaw.log
 ```
 
-The user should receive a response in their messaging app.
+AskUserQuestion: Setup complete! Send a test message to your bot now. In your main channel, just type `hello` — no prefix needed. In groups, use `@ASSISTANT_NAME hello`. Check the logs above for activity. Did you get a response?
+- **Yes, it works!** — Setup is complete
+- **No response** — Help me troubleshoot
+- **Error in logs** — I see an error message
+
+If they need troubleshooting, check the Troubleshooting section below.
 
 ## Troubleshooting
 

@@ -1,10 +1,13 @@
 ---
 name: setup-windows
 description: Set up BastionClaw on Windows via WSL2 + Docker (or Podman). Use when the user wants to run BastionClaw on Windows, set up WSL2, configure Docker on Windows, or get BastionClaw working on a Windows machine. Triggers on "windows", "wsl", "wsl2", "setup windows", "windows setup".
+allowed-tools: Bash(*), Read, Edit, Write, Glob, Grep, AskUserQuestion
 disable-model-invocation: true
 ---
 
 # Setup Windows (WSL2 + Docker/Podman)
+
+**UX Rule:** Use `AskUserQuestion` for ALL interactions with the user. Never just output questions as text — always use the tool so the user gets structured prompts with selectable options.
 
 This skill sets up BastionClaw on Windows using WSL2 with Docker Desktop or Podman as the container runtime. BastionClaw runs entirely inside WSL2 — Windows is only the host OS.
 

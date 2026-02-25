@@ -69,12 +69,14 @@ function createSchema(database: Database.Database): void {
     CREATE TABLE IF NOT EXISTS registered_groups (
       jid TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      folder TEXT NOT NULL UNIQUE,
+      folder TEXT NOT NULL,
       trigger_pattern TEXT NOT NULL,
       added_at TEXT NOT NULL,
       container_config TEXT,
-      requires_trigger INTEGER DEFAULT 1
+      requires_trigger INTEGER DEFAULT 1,
+      channel TEXT
     );
+    CREATE INDEX IF NOT EXISTS idx_registered_groups_folder ON registered_groups(folder);
 
     CREATE TABLE IF NOT EXISTS insight_sources (
       id TEXT PRIMARY KEY,
@@ -127,12 +129,85 @@ function createSchema(database: Database.Database): void {
   }
 }
 
+/** Infer channel type from JID format */
+export function inferChannelFromJid(jid: string): string {
+  if (jid.startsWith('tg:')) return 'telegram';
+  if (jid.startsWith('dc:')) return 'discord';
+  if (jid.endsWith('@g.us') || jid.endsWith('@s.whatsapp.net')) return 'whatsapp';
+  return 'unknown';
+}
+
+/** Get all JIDs that share a folder (for multi-channel broadcast) */
+export function getJidsForFolder(folder: string): string[] {
+  const rows = db.prepare('SELECT jid FROM registered_groups WHERE folder = ?').all(folder) as Array<{ jid: string }>;
+  return rows.map(r => r.jid);
+}
+
+/**
+ * Migrate existing registered_groups table:
+ * - Remove UNIQUE constraint on folder (allows multi-channel per folder)
+ * - Add channel column and backfill from JID patterns
+ */
+function migrateRegisteredGroupsSchema(database: Database.Database): void {
+  // Check if folder has UNIQUE constraint (old schema)
+  const tableInfo = database.prepare(
+    `SELECT sql FROM sqlite_master WHERE type='table' AND name='registered_groups'`
+  ).get() as { sql: string } | undefined;
+
+  if (!tableInfo) return;
+
+  const needsUniqueFix = tableInfo.sql.includes('UNIQUE');
+
+  // Add channel column if missing
+  const hasChannel = tableInfo.sql.includes('channel');
+
+  if (needsUniqueFix) {
+    // Recreate table without UNIQUE on folder
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS registered_groups_new (
+        jid TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        folder TEXT NOT NULL,
+        trigger_pattern TEXT NOT NULL,
+        added_at TEXT NOT NULL,
+        container_config TEXT,
+        requires_trigger INTEGER DEFAULT 1,
+        channel TEXT
+      );
+      INSERT INTO registered_groups_new (jid, name, folder, trigger_pattern, added_at, container_config, requires_trigger)
+        SELECT jid, name, folder, trigger_pattern, added_at, container_config, requires_trigger FROM registered_groups;
+      DROP TABLE registered_groups;
+      ALTER TABLE registered_groups_new RENAME TO registered_groups;
+      CREATE INDEX IF NOT EXISTS idx_registered_groups_folder ON registered_groups(folder);
+    `);
+    logger.info('Migrated registered_groups: removed UNIQUE on folder, added channel column');
+  } else if (!hasChannel) {
+    try {
+      database.exec(`ALTER TABLE registered_groups ADD COLUMN channel TEXT`);
+      logger.info('Added channel column to registered_groups');
+    } catch {
+      /* column already exists */
+    }
+  }
+
+  // Backfill channel from JID patterns
+  const rows = database.prepare('SELECT jid FROM registered_groups WHERE channel IS NULL').all() as Array<{ jid: string }>;
+  if (rows.length > 0) {
+    const stmt = database.prepare('UPDATE registered_groups SET channel = ? WHERE jid = ?');
+    for (const row of rows) {
+      stmt.run(inferChannelFromJid(row.jid), row.jid);
+    }
+    logger.info({ count: rows.length }, 'Backfilled channel column in registered_groups');
+  }
+}
+
 export function initDatabase(): void {
   const dbPath = path.join(STORE_DIR, 'messages.db');
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
   db = new Database(dbPath);
   createSchema(db);
+  migrateRegisteredGroupsSchema(db);
 
   // Migrate from JSON files if they exist
   migrateJsonState();
@@ -516,6 +591,7 @@ export function getRegisteredGroup(
         added_at: string;
         container_config: string | null;
         requires_trigger: number | null;
+        channel: string | null;
       }
     | undefined;
   if (!row) return undefined;
@@ -537,6 +613,7 @@ export function getRegisteredGroup(
     added_at: row.added_at,
     containerConfig,
     requiresTrigger: row.requires_trigger === null ? undefined : row.requires_trigger === 1,
+    channel: row.channel || undefined,
   };
 }
 
@@ -547,9 +624,17 @@ export function setRegisteredGroup(
   if (!isValidGroupFolder(group.folder)) {
     throw new Error(`Invalid group folder name: ${group.folder}`);
   }
+  const channel = group.channel || inferChannelFromJid(jid);
   db.prepare(
-    `INSERT OR REPLACE INTO registered_groups (jid, name, folder, trigger_pattern, added_at, container_config, requires_trigger)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO registered_groups (jid, name, folder, trigger_pattern, added_at, container_config, requires_trigger, channel)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(jid) DO UPDATE SET
+       name = excluded.name,
+       folder = excluded.folder,
+       trigger_pattern = excluded.trigger_pattern,
+       container_config = excluded.container_config,
+       requires_trigger = excluded.requires_trigger,
+       channel = excluded.channel`,
   ).run(
     jid,
     group.name,
@@ -558,6 +643,7 @@ export function setRegisteredGroup(
     group.added_at,
     group.containerConfig ? JSON.stringify(group.containerConfig) : null,
     group.requiresTrigger === undefined ? 1 : group.requiresTrigger ? 1 : 0,
+    channel,
   );
 }
 
@@ -572,6 +658,7 @@ export function getAllRegisteredGroups(): Record<string, RegisteredGroup> {
     added_at: string;
     container_config: string | null;
     requires_trigger: number | null;
+    channel: string | null;
   }>;
   const result: Record<string, RegisteredGroup> = {};
   for (const row of rows) {
@@ -595,6 +682,7 @@ export function getAllRegisteredGroups(): Record<string, RegisteredGroup> {
       added_at: row.added_at,
       containerConfig,
       requiresTrigger: row.requires_trigger === null ? undefined : row.requires_trigger === 1,
+      channel: row.channel || undefined,
     };
   }
   return result;

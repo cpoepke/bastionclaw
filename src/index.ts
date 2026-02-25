@@ -12,9 +12,13 @@ import {
   POLL_INTERVAL,
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_ONLY,
+  DISCORD_BOT_TOKEN,
+  DISCORD_ONLY,
+  DISCORD_WEBHOOK_URLS,
   TRIGGER_PATTERN,
   getContainerRuntime,
 } from './config.js';
+import { DiscordChannel } from './channels/discord.js';
 import { TelegramChannel } from './channels/telegram.js';
 import { WebUIChannel } from './channels/webui.js';
 import { WhatsAppChannel } from './channels/whatsapp.js';
@@ -137,7 +141,7 @@ export function getAvailableGroups(): import('./container-runner.js').AvailableG
   const registeredJids = new Set(Object.keys(registeredGroups));
 
   return chats
-    .filter((c) => c.jid !== '__group_sync__' && (c.jid.endsWith('@g.us') || c.jid.startsWith('tg:')))
+    .filter((c) => c.jid !== '__group_sync__' && (c.jid.endsWith('@g.us') || c.jid.startsWith('tg:') || c.jid.startsWith('dc:')))
     .map((c) => ({
       jid: c.jid,
       name: c.name,
@@ -625,7 +629,7 @@ async function main(): Promise<void> {
   };
 
   // Create and connect channels
-  if (!TELEGRAM_ONLY) {
+  if (!TELEGRAM_ONLY && !DISCORD_ONLY) {
     whatsapp = new WhatsAppChannel(channelOpts);
     channels.push(whatsapp);
     await whatsapp.connect();
@@ -635,6 +639,15 @@ async function main(): Promise<void> {
     const telegram = new TelegramChannel(TELEGRAM_BOT_TOKEN, channelOpts);
     channels.push(telegram);
     await telegram.connect();
+  }
+
+  if (DISCORD_BOT_TOKEN) {
+    const discord = new DiscordChannel(DISCORD_BOT_TOKEN, channelOpts);
+    channels.push(discord);
+    await discord.connect();
+    if (DISCORD_WEBHOOK_URLS.length > 0) {
+      discord.initWebhooks(DISCORD_WEBHOOK_URLS);
+    }
   }
 
   // WebUI channel — register web@chat as an alias for the main group
@@ -675,6 +688,16 @@ async function main(): Promise<void> {
       if (!channel) throw new Error(`No channel for JID: ${jid}`);
       return channel.sendMessage(jid, text);
     },
+    sendWebhookMessage: DISCORD_WEBHOOK_URLS.length > 0
+      ? async (jid, text, sender) => {
+          const ch = findChannel(channels, jid);
+          if (ch instanceof DiscordChannel) {
+            await ch.sendAsWebhook(jid, text, sender);
+          } else if (ch) {
+            await ch.sendMessage(jid, `${sender}: ${text}`);
+          }
+        }
+      : undefined,
     registeredGroups: () => registeredGroups,
     registerGroup,
     syncGroupMetadata: (force) => whatsapp?.syncGroupMetadata(force) ?? Promise.resolve(),

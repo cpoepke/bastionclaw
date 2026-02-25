@@ -1,10 +1,13 @@
 ---
 name: convert-to-docker
 description: Convert BastionClaw from Apple Container to Docker for cross-platform support. Use when user wants to run on Linux, switch to Docker, enable cross-platform deployment, or migrate away from Apple Container. Triggers on "docker", "linux support", "convert to docker", "cross-platform", or "replace apple container".
+allowed-tools: Bash(*), Read, Edit, Write, Glob, Grep, AskUserQuestion
 disable-model-invocation: true
 ---
 
 # Convert to Docker
+
+**UX Rule:** Use `AskUserQuestion` for ALL interactions with the user. Never just output questions as text — always use the tool so the user gets structured prompts with selectable options.
 
 This skill migrates BastionClaw from Apple Container (macOS-only) to Docker for cross-platform support (macOS and Linux).
 

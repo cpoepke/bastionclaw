@@ -1,9 +1,12 @@
 ---
 name: add-telegram
 description: Add Telegram as a channel. Can replace WhatsApp entirely or run alongside it. Also configurable as a control-only channel (triggers actions) or passive channel (receives notifications only).
+allowed-tools: Bash(*), Read, Edit, Write, Glob, Grep, AskUserQuestion
 ---
 
 # Add Telegram Channel
+
+**UX Rule:** Use `AskUserQuestion` for ALL interactions with the user. Never just output questions as text — always use the tool so the user gets structured prompts with selectable options.
 
 This skill adds Telegram support to BastionClaw. Users can choose to:
 
@@ -69,15 +72,15 @@ This step is optional if the user only wants trigger-based responses via @mentio
 
 ## Questions to Ask
 
-Before making changes, ask:
+Use `AskUserQuestion` to collect configuration:
 
-1. **Mode**: Replace WhatsApp or add alongside it?
-   - If replace: Set `TELEGRAM_ONLY=true`
-   - If alongside: Both will run
+AskUserQuestion: Should Telegram replace WhatsApp or run alongside it?
+- **Replace WhatsApp** - Telegram will be the only channel (sets TELEGRAM_ONLY=true)
+- **Alongside** - Both Telegram and WhatsApp channels active
 
-2. **Chat behavior**: Should this chat respond to all messages or only when @mentioned?
-   - Main chat: Responds to all (set `requiresTrigger: false`)
-   - Other chats: Default requires trigger (`requiresTrigger: true`)
+AskUserQuestion: Should this chat respond to all messages or only when @mentioned?
+- **All messages** - Responds to everything (sets `requiresTrigger: false`)
+- **Only when @mentioned** - Requires trigger (default, `requiresTrigger: true`)
 
 ## Architecture
 
@@ -629,9 +632,9 @@ launchctl load ~/Library/LaunchAgents/com.bastionclaw.plist
 
 ## Agent Swarms (Teams)
 
-After completing the Telegram setup, ask the user:
+After completing the Telegram setup, use `AskUserQuestion`:
 
-> Would you like to add Agent Swarm support? Without it, Agent Teams still work — they just operate behind the scenes. With Swarm support, each subagent appears as a different bot in the Telegram group so you can see who's saying what and have interactive team sessions.
+AskUserQuestion: Would you like to add Agent Swarm support? Without it, Agent Teams still work — they just operate behind the scenes. With Swarm support, each subagent appears as a different bot in the Telegram group so you can see who's saying what and have interactive team sessions.
 
 If they say yes, invoke the `/add-telegram-swarm` skill.
 
