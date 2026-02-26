@@ -130,7 +130,7 @@ WSL2 shuts down when you close all terminal windows. To keep BastionClaw running
 - **Scheduled tasks** — Recurring jobs that run the agent and can message you back
 - **Web access** — Search and fetch content
 - **Container isolation** — Agents sandboxed in Apple Container (macOS) or Docker (macOS/Linux/Windows WSL2)
-- **Agent Swarms** — Spin up teams of specialized agents that collaborate on complex tasks. On Discord, each agent gets its own identity (username + avatar) via webhooks (`/add-discord-swarm`). On Telegram, each agent gets its own bot identity (`/add-telegram-swarm`).
+- **Agent Swarms** — Spin up teams of specialized agents that collaborate on complex tasks. Multiple swarms can run on different channels simultaneously, each with its own team composition and isolated group folder. See [Agent Swarms](#agent-swarms) below for details.
 - **Optional integrations** — Add Gmail (`/add-gmail`), voice transcription (`/add-voice-transcription`), and more via skills
 - **Semantic memory** — Long-term memory powered by [qmd](https://github.com/tobi/qmd) with hybrid search (BM25 + vector + LLM reranking). Conversations are progressively indexed mid-session and archived at compaction. The agent naturally recalls past discussions without being asked. Runs fully local with GGUF models (~2GB) — no cloud APIs needed. See [docs/MEMORY.md](docs/MEMORY.md) for architecture details.
 - **Insight engine** (optional) — Ingest articles, YouTube videos, PDFs, and podcasts to extract generalizable insights. The system deduplicates semantically — when multiple independent sources express the same idea, they merge and the insight's corroboration count rises. Top insights surface the most widely-observed principles across all your content. See [docs/INSIGHTS.md](docs/INSIGHTS.md) for architecture details.
@@ -187,21 +187,78 @@ Optionally, BastionClaw turns raw content into actionable knowledge through a fo
 
 To enable the pipeline, run `/ingest` to add individual sources or `/refresh-insights` to set up YouTube channel monitoring with scheduled tasks that automatically fetch new videos and extract insights on a recurring basis.
 
+## Agent Swarms
+
+Agent Swarms let you create teams of specialized agents that collaborate on tasks. Each agent gets its own visible identity in the chat — distinct usernames and avatars on Discord, separate bot identities on Telegram — so users can see who's doing what.
+
+### How it works
+
+When a user sends a task, the lead agent breaks it into subtasks and delegates to specialists (Researcher, Developer, Reviewer, etc.) using Claude's agent teams. Each specialist posts their work to the group chat via `send_message` with a `sender` parameter that identifies them. The host routes each message through the appropriate channel identity:
+
+- **Discord**: Per-channel webhooks. Each `sender` name becomes a unique username + auto-generated avatar.
+- **Telegram**: Bot pool. Each `sender` is assigned a dedicated bot from a pool of 3-5 bots you create via BotFather.
+
+### Multi-swarm support
+
+You can run multiple swarms on different channels simultaneously. Each swarm has:
+
+- **Its own Discord channel or Telegram group** with a dedicated webhook/bot pool
+- **Its own team composition** — a marketing channel might have a Writer, Editor, and Fact-Checker while a dev channel has an Architect, Developer, and QA Reviewer
+- **Its own isolated group folder** (`groups/discord-marketing/`, `groups/telegram-research/`, etc.) with separate `CLAUDE.md` instructions and memory
+- **Per-channel webhook routing** — webhook URLs are stored in each group's `container_config` in the database, not a shared env var
+
+Each swarm runs in its own container (~1GB RAM). The default limit is 5 concurrent containers shared across all channels, configurable via `MAX_CONCURRENT_CONTAINERS` in `.env`.
+
+### Setting up a swarm
+
+**Discord swarm:**
+
+```bash
+claude
+# then type: /add-discord-swarm
+```
+
+The skill walks you through:
+1. Choosing a theme name based on interest (marketing, stocks, research, dev, personal)
+2. Defining team composition from templates or custom roles
+3. Creating a Discord webhook for the specific channel
+4. Writing team instructions to the group's `CLAUDE.md`
+
+If swarms already exist, you can add a new one alongside them, replace an existing one, or update a swarm's team composition.
+
+**Telegram swarm:**
+
+```bash
+claude
+# then type: /add-telegram-swarm
+```
+
+Similar flow, but instead of webhooks you create 3-5 pool bots via BotFather. Each bot is renamed dynamically to match the agent's role when it first speaks.
+
+### Commands
+
+| Command | What it does |
+|---------|-------------|
+| `/add-discord-swarm` | Add a new Discord swarm, update an existing one, or replace one |
+| `/add-telegram-swarm` | Add a new Telegram swarm with bot pool identities |
+| `/add-discord` | Set up Discord as a channel (prerequisite for Discord swarms) |
+| `/add-telegram` | Set up Telegram as a channel (prerequisite for Telegram swarms) |
+
 ## Usage
 
-Talk to your assistant with the trigger word (default: `@Kia`):
+Talk to your assistant with the trigger word (default: `@Kai`):
 
 ```
-@Kia send an overview of the sales pipeline every weekday morning at 9am (has access to my Obsidian vault folder)
-@Kia review the git history for the past week each Friday and update the README if there's drift
-@Kia every Monday at 8am, compile news on AI developments from Hacker News and TechCrunch and message me a briefing
+@Kai send an overview of the sales pipeline every weekday morning at 9am (has access to my Obsidian vault folder)
+@Kai review the git history for the past week each Friday and update the README if there's drift
+@Kai every Monday at 8am, compile news on AI developments from Hacker News and TechCrunch and message me a briefing
 ```
 
 From the main channel (DM with bot), you can manage groups and tasks:
 ```
-@Kia list all scheduled tasks across groups
-@Kia pause the Monday briefing task
-@Kia join the Family Chat group
+@Kai list all scheduled tasks across groups
+@Kai pause the Monday briefing task
+@Kai join the Family Chat group
 ```
 
 ## Updating
