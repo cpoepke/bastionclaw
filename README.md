@@ -386,7 +386,7 @@ Yes, via WSL2. See the [Windows quick start](#windows) above. Run `/setup-window
 
 **Is this secure?**
 
-Agents run in containers, not behind application-level permission checks. They can only access explicitly mounted directories. You should still review what you're running, but the codebase is small enough that you actually can. See [docs/SECURITY.md](docs/SECURITY.md) for the full security model.
+Agents run in containers, not behind application-level permission checks. They can only access explicitly mounted directories. You should still review what you're running, but the codebase is small enough that you actually can. See [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md) for the full security model.
 
 **How do I debug issues?**
 
