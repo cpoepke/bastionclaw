@@ -645,9 +645,15 @@ async function main(): Promise<void> {
     const discord = new DiscordChannel(DISCORD_BOT_TOKEN, channelOpts);
     channels.push(discord);
     await discord.connect();
-    if (DISCORD_WEBHOOK_URLS.length > 0) {
-      discord.initWebhooks(DISCORD_WEBHOOK_URLS);
+
+    // Build JID→webhook map from registered groups with per-channel webhooks
+    const webhookMapping: Record<string, string> = {};
+    for (const [jid, group] of Object.entries(registeredGroups)) {
+      if (jid.startsWith('dc:') && group.containerConfig?.webhookUrl) {
+        webhookMapping[jid] = group.containerConfig.webhookUrl;
+      }
     }
+    discord.initWebhooks(webhookMapping, DISCORD_WEBHOOK_URLS);
   }
 
   // WebUI channel — register web@chat as an alias for the main group
@@ -688,7 +694,7 @@ async function main(): Promise<void> {
       if (!channel) throw new Error(`No channel for JID: ${jid}`);
       return channel.sendMessage(jid, text);
     },
-    sendWebhookMessage: DISCORD_WEBHOOK_URLS.length > 0
+    sendWebhookMessage: DISCORD_BOT_TOKEN
       ? async (jid, text, sender) => {
           const ch = findChannel(channels, jid);
           if (ch instanceof DiscordChannel) {
@@ -700,6 +706,10 @@ async function main(): Promise<void> {
       : undefined,
     registeredGroups: () => registeredGroups,
     registerGroup,
+    registerWebhook: (jid, url) => {
+      const ch = channels.find(c => c instanceof DiscordChannel) as DiscordChannel | undefined;
+      ch?.registerWebhook(jid, url);
+    },
     syncGroupMetadata: (force) => whatsapp?.syncGroupMetadata(force) ?? Promise.resolve(),
     getAvailableGroups,
     writeGroupsSnapshot: (gf, im, ag, rj) => writeGroupsSnapshot(gf, im, ag, rj),

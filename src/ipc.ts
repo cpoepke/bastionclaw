@@ -31,6 +31,7 @@ export interface IpcDeps {
   sendWebhookMessage?: (jid: string, text: string, sender: string) => Promise<void>;
   registeredGroups: () => Record<string, RegisteredGroup>;
   registerGroup: (jid: string, group: RegisteredGroup) => void;
+  registerWebhook?: (jid: string, url: string) => void;
   syncGroupMetadata: (force: boolean) => Promise<void>;
   getAvailableGroups: () => AvailableGroup[];
   writeGroupsSnapshot: (
@@ -423,6 +424,10 @@ export async function processTaskIpc(
           containerConfig: data.containerConfig,
           channel: data.channel,
         });
+        // Register per-channel webhook if provided in containerConfig
+        if (data.containerConfig?.webhookUrl && deps.registerWebhook) {
+          deps.registerWebhook(data.jid, data.containerConfig.webhookUrl);
+        }
       } else {
         logger.warn(
           { data },

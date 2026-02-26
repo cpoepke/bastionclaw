@@ -9,6 +9,51 @@ import {
   RegisteredGroup,
 } from '../types.js';
 
+/**
+ * Split text into chunks that respect word boundaries.
+ * Tries to split on newlines first, then spaces, and only
+ * hard-splits mid-word as a last resort.
+ */
+function chunkText(text: string, maxLength: number): string[] {
+  if (text.length <= maxLength) return [text];
+
+  const chunks: string[] = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= maxLength) {
+      chunks.push(remaining);
+      break;
+    }
+
+    let splitAt = -1;
+
+    // Try to split at a newline
+    const lastNewline = remaining.lastIndexOf('\n', maxLength);
+    if (lastNewline > 0) {
+      splitAt = lastNewline + 1; // keep the newline in the first chunk
+    }
+
+    // Fall back to last space
+    if (splitAt <= 0) {
+      const lastSpace = remaining.lastIndexOf(' ', maxLength);
+      if (lastSpace > 0) {
+        splitAt = lastSpace + 1;
+      }
+    }
+
+    // Hard split as last resort
+    if (splitAt <= 0) {
+      splitAt = maxLength;
+    }
+
+    chunks.push(remaining.slice(0, splitAt));
+    remaining = remaining.slice(splitAt);
+  }
+
+  return chunks;
+}
+
 export interface DiscordChannelOpts {
   onMessage: OnInboundMessage;
   onChatMetadata: OnChatMetadata;
@@ -21,38 +66,37 @@ export class DiscordChannel implements Channel {
   private client: Client | null = null;
   private opts: DiscordChannelOpts;
   private botToken: string;
-  private webhooks: WebhookClient[] = [];
+  private webhookMap = new Map<string, WebhookClient>();
+  private defaultWebhook: WebhookClient | null = null;
 
   constructor(botToken: string, opts: DiscordChannelOpts) {
     this.botToken = botToken;
     this.opts = opts;
   }
 
-  initWebhooks(urls: string[]): void {
-    for (const url of urls) {
-      this.webhooks.push(new WebhookClient({ url }));
+  initWebhooks(mapping: Record<string, string>, fallbackUrls: string[]): void {
+    for (const [jid, url] of Object.entries(mapping)) {
+      this.webhookMap.set(jid, new WebhookClient({ url }));
     }
-    if (this.webhooks.length > 0) {
-      logger.info({ count: this.webhooks.length }, 'Discord webhooks initialized');
+    if (fallbackUrls.length > 0) {
+      this.defaultWebhook = new WebhookClient({ url: fallbackUrls[0] });
     }
+    logger.info({ mapped: this.webhookMap.size, fallback: !!this.defaultWebhook }, 'Discord webhooks initialized');
+  }
+
+  registerWebhook(jid: string, url: string): void {
+    this.webhookMap.set(jid, new WebhookClient({ url }));
+    logger.info({ jid }, 'Discord webhook registered');
   }
 
   async sendAsWebhook(jid: string, text: string, sender: string): Promise<void> {
-    const wh = this.webhooks[0];
+    const wh = this.webhookMap.get(jid) || this.defaultWebhook;
     if (!wh) {
       await this.sendMessage(jid, `${sender}: ${text}`);
       return;
     }
 
-    const MAX_LENGTH = 2000;
-    const chunks: string[] = [];
-    if (text.length <= MAX_LENGTH) {
-      chunks.push(text);
-    } else {
-      for (let i = 0; i < text.length; i += MAX_LENGTH) {
-        chunks.push(text.slice(i, i + MAX_LENGTH));
-      }
-    }
+    const chunks = chunkText(text, 2000);
 
     for (const chunk of chunks) {
       await wh.send({
@@ -216,13 +260,9 @@ export class DiscordChannel implements Channel {
 
       const textChannel = channel as TextChannel;
 
-      const MAX_LENGTH = 2000;
-      if (text.length <= MAX_LENGTH) {
-        await textChannel.send(text);
-      } else {
-        for (let i = 0; i < text.length; i += MAX_LENGTH) {
-          await textChannel.send(text.slice(i, i + MAX_LENGTH));
-        }
+      const chunks = chunkText(text, 2000);
+      for (const chunk of chunks) {
+        await textChannel.send(chunk);
       }
       logger.info({ jid, length: text.length }, 'Discord message sent');
     } catch (err) {
