@@ -211,7 +211,7 @@ function readSecrets(): Record<string, string> {
   if (!fs.existsSync(envFile)) return {};
 
   // SDK auth + API keys needed by agent Bash tool calls
-  const allowedVars = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'TRANSCRIPT_API_KEY'];
+  const allowedVars = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'TRANSCRIPT_API_KEY', 'GEMINI_API_KEY'];
   const secrets: Record<string, string> = {};
   const content = fs.readFileSync(envFile, 'utf-8');
 

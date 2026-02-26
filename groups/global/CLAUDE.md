@@ -38,6 +38,10 @@ When working as a sub-agent or teammate, only use `send_message` if instructed t
 
 Files you create are saved in `/workspace/group/`. Use this for notes, research, or anything that should persist.
 
+## Skills
+
+Skills are instruction files in `/workspace/group/skills/`. To use a skill, read the file with `cat` and follow its instructions. Skills are NOT invokable tools — they are documentation that tells you what script to run and how to run it. There is no "Skill tool" in this environment. Just read the `.md` file and execute the commands it describes.
+
 ## Memory
 
 You have a long-term semantic memory that indexes all your workspace files and past conversations.

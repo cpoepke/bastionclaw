@@ -7,6 +7,48 @@ import {
 import { logger } from "../logger.js";
 import { Channel, OnInboundMessage, OnChatMetadata, RegisteredGroup } from "../types.js";
 
+/**
+ * Split text into chunks that respect word boundaries.
+ * Tries to split on newlines first, then spaces, and only
+ * hard-splits mid-word as a last resort.
+ */
+function chunkText(text: string, maxLength: number): string[] {
+  if (text.length <= maxLength) return [text];
+
+  const chunks: string[] = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= maxLength) {
+      chunks.push(remaining);
+      break;
+    }
+
+    let splitAt = -1;
+
+    const lastNewline = remaining.lastIndexOf('\n', maxLength);
+    if (lastNewline > 0) {
+      splitAt = lastNewline + 1;
+    }
+
+    if (splitAt <= 0) {
+      const lastSpace = remaining.lastIndexOf(' ', maxLength);
+      if (lastSpace > 0) {
+        splitAt = lastSpace + 1;
+      }
+    }
+
+    if (splitAt <= 0) {
+      splitAt = maxLength;
+    }
+
+    chunks.push(remaining.slice(0, splitAt));
+    remaining = remaining.slice(splitAt);
+  }
+
+  return chunks;
+}
+
 export interface TelegramChannelOpts {
   onMessage: OnInboundMessage;
   onChatMetadata: OnChatMetadata;
@@ -191,13 +233,9 @@ export class TelegramChannel implements Channel {
       const numericId = jid.replace(/^tg:/, "");
 
       // Telegram has a 4096 character limit per message — split if needed
-      const MAX_LENGTH = 4096;
-      if (text.length <= MAX_LENGTH) {
-        await this.bot.api.sendMessage(numericId, text);
-      } else {
-        for (let i = 0; i < text.length; i += MAX_LENGTH) {
-          await this.bot.api.sendMessage(numericId, text.slice(i, i + MAX_LENGTH));
-        }
+      const chunks = chunkText(text, 4096);
+      for (const chunk of chunks) {
+        await this.bot.api.sendMessage(numericId, chunk);
       }
       logger.info({ jid, length: text.length }, "Telegram message sent");
     } catch (err) {
