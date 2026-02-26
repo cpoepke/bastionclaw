@@ -392,6 +392,10 @@ Agents run in containers, not behind application-level permission checks. They c
 
 Run `claude`, then run `/debug`. Check `logs/bastionclaw.log` and `logs/bastionclaw.error.log` for details.
 
+## Community
+
+Join the [BastionClaw Discord](https://discord.gg/wef36a7B) for support, discussion, and sharing your agent setups.
+
 ## Upstream
 
 This project is a fork of [NanoClaw](https://github.com/qwibitai/nanoclaw) by [@gavrielc](https://github.com/gavrielc). Check out the upstream project for the original vision, community Discord, and contribution guidelines.
