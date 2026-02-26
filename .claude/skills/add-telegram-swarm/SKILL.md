@@ -48,6 +48,48 @@ AskUserQuestion: "What theme name for this swarm? Name it based on the group's i
 
 **Never default to "telegram-main"** — always require a theme name.
 
+## Phase 1: Create Telegram Group & Add Bots
+
+### Step 1: Create or choose a group
+
+AskUserQuestion: "Do you already have a Telegram group for this swarm, or do you need to create one?"
+- **Create a new group** (Recommended) — I'll walk you through creating a dedicated group
+- **Use an existing group** — I already have a group ready
+
+#### If creating a new group:
+
+Guide the user through creating a Telegram group named after the swarm theme:
+
+1. Open Telegram and tap the **pencil/compose** icon (top right)
+2. Select **New Group**
+3. Name it after your swarm theme — e.g., "Research", "Marketing", "Stocks"
+4. Add your **main bot** (search for its @username) as a member
+5. Tap **Create**
+
+After creation, you'll add the pool bots in the Prerequisites step below.
+
+### Step 2: Security reminder
+
+Present this to the user via AskUserQuestion (confirm they understand before proceeding):
+
+> **Security note:** Anyone in this Telegram group can command the bot — triggering agent containers that run with your API key and have access to tools, memory, and scheduled tasks.
+>
+> **Keep the group private.** Do not share invite links. If you want shared access, create a separate group registered with `requiresTrigger: true` so others must @mention the bot and get limited (non-admin) access.
+>
+> Unlike private DMs, group messages are visible to all group members. Be mindful of what information you ask the bot to process in a group setting.
+
+### Step 3: Ensure main bot has Group Privacy disabled
+
+The main bot must be able to see all messages in the group (not just @mentions):
+
+1. Open `@BotFather` in Telegram
+2. Send `/mybots` and select your **main bot**
+3. Go to **Bot Settings** > **Group Privacy**
+4. If it says "enabled", select **Turn off**
+5. **Remove and re-add the main bot to the group** — this is required for the change to take effect
+
+Skip this step if the main bot already has Group Privacy disabled (you can check in BotFather).
+
 ## How It Works
 
 - The **main bot** receives messages and sends lead agent responses (already set up by `/add-telegram`)
@@ -78,7 +120,6 @@ Tell the user:
 >    - Give them any placeholder name (e.g., "Bot 1", "Bot 2")
 >    - Usernames like `myproject_swarm_1_bot`, `myproject_swarm_2_bot`, etc.
 > 3. Copy all the tokens
-> 4. Add all bots to your Telegram group(s) where you want agent teams
 
 Wait for user to provide the tokens.
 
@@ -88,11 +129,23 @@ Tell the user:
 
 > **Important**: Each pool bot needs Group Privacy disabled so it can send messages in groups.
 >
-> For each pool bot in `@BotFather`:
+> For **each** pool bot in `@BotFather`:
 > 1. Send `/mybots` and select the bot
 > 2. Go to **Bot Settings** > **Group Privacy** > **Turn off**
+
+### 3. Add Pool Bots to the Swarm Group
+
+Tell the user:
+
+> Now add all pool bots to the Telegram group you created for this swarm:
 >
-> Then add all pool bots to your Telegram group(s).
+> 1. Open the group in Telegram
+> 2. Tap the group name at the top to open group info
+> 3. Tap **Add Members**
+> 4. Search for each pool bot by its @username and add it
+> 5. Verify all bots appear in the member list
+>
+> **Note:** After adding a bot whose Group Privacy setting was just changed, you may need to remove and re-add it for the change to take effect.
 
 ### 3. Image Generation Setup (if applicable)
 

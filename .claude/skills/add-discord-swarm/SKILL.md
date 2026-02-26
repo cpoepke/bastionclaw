@@ -152,51 +152,115 @@ If the user wants to set it up:
 
    If `NEEDS_ADDING`, find the `allowedVars` array in `src/container-runner.ts` and add `'GEMINI_API_KEY'` to it.
 
-## Phase 2: Discord Webhook Setup
+## Phase 2: Discord Channel & Webhook Setup
 
-Guide the user through creating a webhook **for the specific Discord channel** where this swarm will operate:
+### Step 1: Create or choose a channel
 
-1. Open Discord and go to the channel for this swarm
-2. Click the **gear icon** (Edit Channel) next to the channel name
-3. Go to **Integrations** > **Webhooks**
-4. Click **New Webhook**
-5. Name it anything (e.g., "BastionClaw Swarm") — the name doesn't matter, each message sets its own username
+AskUserQuestion: "Do you already have a Discord channel for this swarm, or do you need to create one?"
+- **Create a new channel** (Recommended) — I'll walk you through creating a dedicated channel
+- **Use an existing channel** — I already have a channel ready
+
+#### If creating a new channel:
+
+Guide the user through creating a dedicated channel named after the swarm theme (from Phase 1):
+
+1. In your Discord server, click the **+** next to "TEXT CHANNELS"
+2. Name it after your swarm theme — e.g., `research`, `marketing`, `stocks`, `dev`
+3. Toggle **Private Channel** ON — this prevents other server members from seeing it
+4. Click **Create Channel**
+
+**Why private?** The bot reads every message in channels it can see. A private channel ensures only you (and the bot) can interact with the swarm. Anyone who can type in the channel can command the bot using your API credentials.
+
+### Step 2: Grant bot access to the channel
+
+The bot cannot see private channels by default. You must explicitly grant it access:
+
+1. Right-click the channel > **Edit Channel** > **Permissions**
+2. Click **Add members or roles**
+3. Search for your bot's name (e.g., "Kai") and add it
+4. **Click on the bot's name** in the permission overrides list to select it
+5. Set these permissions specifically **for the bot**:
+   - **View Channel** ✅
+   - **Send Messages** ✅
+   - **Send Messages in Threads** ✅
+   - **Create Public Threads** ✅
+   - **Read Message History** ✅
+6. Click **Save Changes**
+
+Also verify **@everyone** has **View Channel** set to ✗ (deny) — this prevents new server members from seeing the channel.
+
+### Step 3: Security reminder
+
+Present this to the user via AskUserQuestion (confirm they understand before proceeding):
+
+> **Security note:** Anyone who can see this channel can command the bot — triggering agent containers that run with your API key and have access to tools, memory, and scheduled tasks.
+>
+> **Keep the channel private.** If you want shared access later, create a separate non-main channel with `requiresTrigger: true` so others must @mention the bot and get limited (non-admin) access.
+>
+> Never give anyone the **Administrator** server permission — they can see all channels including private ones.
+
+### Step 4: Create the webhook
+
+1. Right-click the channel > **Edit Channel** (or click the gear icon)
+2. Go to **Integrations** > **Webhooks**
+3. Click **New Webhook**
+4. Name it anything (e.g., "BastionClaw Swarm") — the name doesn't matter, each message overrides the username
+5. **Verify the webhook is for the correct channel** — the channel name should be shown on the webhook
 6. Click **Copy Webhook URL**
-7. Share the URL
+
+AskUserQuestion: "Paste the Discord webhook URL here."
+
+### Extract channel ID from webhook
+
+**Do NOT guess or ask which channel to use.** The webhook URL contains the channel ID. Query the Discord API to extract it directly:
+
+```bash
+curl -s "WEBHOOK_URL" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'CHANNEL_ID={d[\"channel_id\"]}\nGUILD_ID={d[\"guild_id\"]}\nNAME={d.get(\"name\",\"\")}')"
+```
+
+Use the returned `CHANNEL_ID` as `dc:{CHANNEL_ID}` for the JID. No assumptions needed.
 
 ### Save the webhook URL in container_config (NOT in .env)
 
 The webhook URL is stored per-group in `container_config` JSON, not in `DISCORD_WEBHOOK_URLS` env var. This enables multiple swarms with different webhooks.
 
-Get the Discord channel JID:
+Check if this channel is already registered:
 
 ```bash
-sqlite3 store/messages.db "SELECT jid, name FROM registered_groups WHERE jid LIKE 'dc:%'"
+sqlite3 store/messages.db "SELECT jid, name, folder FROM registered_groups WHERE jid = 'dc:CHANNEL_ID'"
 ```
 
-If the channel is not yet registered, register it first. The JID format is `dc:{channelId}`.
-
-Register the group with the webhook URL in container_config:
+First, read the bot's assistant name from config to use as the trigger value:
 
 ```bash
-# For a new group — write IPC file to register via the register_group handler
-# The folder name is discord-{theme} from Phase 1
+grep "ASSISTANT_NAME" .env | head -1
+```
+
+Register the group with the webhook URL in container_config. Swarm channels default to `requires_trigger = 0` (responds to all messages) since they're typically private, dedicated channels:
+
+```bash
+sqlite3 store/messages.db "INSERT INTO registered_groups (jid, name, folder, trigger_pattern, requires_trigger, channel, container_config, added_at) VALUES ('dc:CHANNEL_ID', 'CHANNEL_NAME', 'discord-THEME', '@ASSISTANT_NAME', 0, 'discord', '{\"webhookUrl\":\"WEBHOOK_URL\"}', '$(date -u +%Y-%m-%dT%H:%M:%S.000Z)')"
+```
+
+Then notify the running service to load the new group and register its webhook:
+
+```bash
 cat > data/ipc/main/tasks/register-swarm-$(date +%s).json << 'EOF'
 {
   "type": "register_group",
   "jid": "dc:CHANNEL_ID",
   "name": "CHANNEL_NAME",
   "folder": "discord-THEME",
-  "trigger": "@bastionclaw",
+  "trigger": "@ASSISTANT_NAME",
   "channel": "discord",
   "containerConfig": {
-    "webhookUrl": "https://discord.com/api/webhooks/..."
+    "webhookUrl": "WEBHOOK_URL"
   }
 }
 EOF
 ```
 
-Or update an existing group's container_config directly:
+**For an existing group** — update container_config only:
 
 ```bash
 sqlite3 store/messages.db "UPDATE registered_groups SET container_config = json_set(COALESCE(container_config, '{}'), '$.webhookUrl', 'WEBHOOK_URL') WHERE jid = 'dc:CHANNEL_ID'"
@@ -204,14 +268,13 @@ sqlite3 store/messages.db "UPDATE registered_groups SET container_config = json_
 
 ### Verify the webhook works
 
+**IMPORTANT**: Always write JSON to a temp file and pass via `-d @` — inline `-d '{...}'` causes shell quoting issues that return `400 invalid JSON`:
+
 ```bash
-# Test the webhook with curl
-curl -X POST "WEBHOOK_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"content": "Swarm webhook test!", "username": "TestBot", "avatar_url": "https://ui-avatars.com/api/?name=Test&background=random&size=128"}'
+echo '{"content":"Swarm webhook test!","username":"TestBot"}' > /tmp/webhook-test.json && curl -s -X POST "WEBHOOK_URL" -H "Content-Type: application/json" -d @/tmp/webhook-test.json && rm /tmp/webhook-test.json
 ```
 
-If a message appears in Discord from "TestBot", the webhook is working.
+No output means success — the message was sent. If you see an error, check the URL is correct.
 
 ## Phase 3: Code Verification
 
@@ -384,3 +447,5 @@ npm run build
 - **Messages going to wrong channel**: Each swarm channel needs its own webhook URL in `container_config`. Check: `sqlite3 store/messages.db "SELECT jid, container_config FROM registered_groups WHERE jid LIKE 'dc:%'"`
 - **Messages too long**: The code auto-chunks at 2000 chars, but remind agents to keep messages short in CLAUDE.md
 - **Fallback behavior**: Groups without a `webhookUrl` in `container_config` will use the `DISCORD_WEBHOOK_URLS` env var as fallback. If neither is set, messages are sent as the bot itself.
+- **Bot can't see channel / no response**: The bot needs explicit permissions on private channels. Right-click channel > Edit Channel > Permissions > click bot's name in overrides list > grant View Channel, Send Messages, Send Messages in Threads, Create Public Threads, Read Message History > Save
+- **Thread replies failing**: Bot needs **Send Messages in Threads** and **Create Public Threads** permissions on the channel. See Phase 2 Step 2.

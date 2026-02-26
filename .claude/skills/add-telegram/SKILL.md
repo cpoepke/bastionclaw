@@ -82,6 +82,26 @@ AskUserQuestion: Should this chat respond to all messages or only when @mentione
 - **All messages** - Responds to everything (sets `requiresTrigger: false`)
 - **Only when @mentioned** - Requires trigger (default, `requiresTrigger: true`)
 
+## Security
+
+**Present this warning to the user before proceeding:**
+
+> **SECURITY WARNING: Anyone in a Telegram group with your bot can command it.**
+>
+> The bot runs with your Claude API credentials and has access to your agent's tools, memory, and scheduled tasks. In group chats, anyone who can see the group can trigger the bot.
+>
+> **What this means:**
+> - If you add someone to a group with the bot, they can use your bot
+> - They can trigger agent containers that run with your API key
+> - They can potentially read your agent's memory and conversation history
+> - The main chat has admin privileges (register groups, schedule tasks, manage all groups)
+>
+> **Recommendations:**
+> 1. Use **private DMs** with the bot for your main (admin) channel — only you can see those messages
+> 2. If you want others to use the bot, create a **separate group** registered with `requiresTrigger: true` — this limits them to @mention interactions only, no admin access
+> 3. Don't share group invite links for groups containing the bot
+> 4. For group chats, remember that all messages (including bot responses) are visible to all group members
+
 ## Architecture
 
 BastionClaw uses a **Channel abstraction** (`Channel` interface in `src/types.ts`). Each messaging platform implements this interface. Key files:

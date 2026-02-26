@@ -70,8 +70,14 @@ Only you (the server owner) can see this channel now. **After the bot is invited
 1. Right-click the bot channel > **Edit Channel** > **Permissions**
 2. Click **Add members or roles**
 3. Search for your bot's name and add it
-4. Grant: **View Channel**, **Send Messages**, **Read Message History**
-5. Click **Save Changes** (or **Sync** if shown)
+4. **Click on the bot's name** in the permission overrides list to select it
+5. Set these permissions specifically **for the bot**:
+   - **View Channel** ✅
+   - **Send Messages** ✅
+   - **Send Messages in Threads** ✅
+   - **Create Public Threads** ✅
+   - **Read Message History** ✅
+6. Click **Save Changes** (or **Sync** if shown)
 
 ## Phase 4: Create a Discord Bot
 
@@ -106,7 +112,7 @@ Do this BEFORE copying the token — the invite URL doesn't require the token, a
 
 1. Go to the **OAuth2** tab (left sidebar)
 2. Under **OAuth2 URL Generator**, select scope: `bot`
-3. Under **Bot Permissions**, select: `Send Messages`, `Read Message History`, `View Channels`
+3. Under **Bot Permissions**, select: `View Channels`, `Send Messages`, `Send Messages in Threads`, `Create Public Threads`, `Read Message History`
 4. Copy the generated URL and open it in your browser
 5. Select your server from the dropdown and click **Authorize**
 
@@ -224,7 +230,7 @@ Send a test message in the Discord channel mentioning the bot (`@BotName hello`)
 
 ## Troubleshooting
 
-- **Bot not visible in private channel / no response**: The bot can't see private channels by default. Right-click channel > Edit Channel > Permissions > Add members or roles > add your bot > grant View Channel, Send Messages, Read Message History > Save/Sync
+- **Bot not visible in private channel / no response**: The bot can't see private channels by default. Right-click channel > Edit Channel > Permissions > Add members or roles > add your bot > **click on the bot's name** in the overrides list > grant View Channel, Send Messages, Send Messages in Threads, Create Public Threads, Read Message History > Save/Sync
 - **"500 error" saving bot settings**: Go to Installation tab first and set Default Install Link to **None**, then save. After that, Bot tab saves will work.
 - **Bot doesn't respond**: Check that Message Content Intent is enabled in the Discord Developer Portal
 - **"Missing Access" errors**: Ensure the bot has permissions in the channel (Send Messages, Read Message History)
