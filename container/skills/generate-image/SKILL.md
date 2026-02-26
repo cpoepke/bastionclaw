@@ -42,6 +42,10 @@ Bad edit prompts (too vague or re-describe the whole image):
 | `4:3` | Documentation images, screenshots |
 | `9:16` | Mobile/story format |
 | `3:4` | Portrait format |
+| `4:1` | Ultra-wide panoramic banners |
+| `1:4` | Tall vertical infographics |
+| `8:1` | Extreme panoramic strips |
+| `1:8` | Extreme vertical strips |
 
 Default to `16:9` for technical diagrams. Ask the user if unclear.
 

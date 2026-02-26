@@ -17,7 +17,7 @@ if (!GEMINI_API_KEY) {
 }
 
 async function generateImage(prompt, outputPath, options = {}) {
-  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent";
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent";
 
   // Build generation config with optional aspect ratio
   const generationConfig = {
@@ -93,7 +93,7 @@ Usage: node generate-image.js "prompt" "output-path" [options]
 
 Options:
   --input, -i          Source image to edit (enables image editing mode)
-  --aspect-ratio, -ar  Set aspect ratio (1:1, 16:9, 9:16, 4:3, 3:4, 21:9)
+  --aspect-ratio, -ar  Set aspect ratio (1:1, 16:9, 9:16, 4:3, 3:4, 21:9, 4:1, 1:4, 8:1, 1:8)
   --help, -h           Show this help message
 
 Examples:
