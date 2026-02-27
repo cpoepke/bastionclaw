@@ -9,15 +9,21 @@ Generate images using Gemini's image model via `scripts/generate-image.js`. Spec
 
 ## Usage
 
-```bash
-# Generate a new image
-node scripts/generate-image.js "<prompt>" "<output-path>" [--aspect-ratio 16:9]
+First, resolve the script path (it may be in different locations depending on environment):
 
-# Edit an existing image
-node scripts/generate-image.js "<edit prompt>" "<output-path>" --input <source-image> [--aspect-ratio 16:9]
+```bash
+GEN_IMG=$(test -f scripts/generate-image.js && echo scripts/generate-image.js || test -f /workspace/group/scripts/generate-image.js && echo /workspace/group/scripts/generate-image.js || echo /workspace/project/scripts/generate-image.js)
 ```
 
-Requires `GEMINI_API_KEY` in `.env`.
+```bash
+# Generate a new image
+node "$GEN_IMG" "<prompt>" "<output-path>" [--aspect-ratio 16:9]
+
+# Edit an existing image
+node "$GEN_IMG" "<edit prompt>" "<output-path>" --input <source-image> [--aspect-ratio 16:9]
+```
+
+Requires `GEMINI_API_KEY` environment variable (passed via container env, not .env file).
 
 ## Image Editing
 
@@ -88,15 +94,13 @@ All project diagrams use a **whiteboard sketch style** — hand-drawn feel with 
 
 ## Whiteboard Background
 
-All whiteboard-style diagrams use a pre-made background image as the canvas. The background is bundled with this skill at multiple locations — use the first one that exists:
-1. `~/.claude/skills/generate-image/whiteboard-background.png` (container agents)
-2. `docs/whiteboard-background.png` (host/project root)
+All whiteboard-style diagrams use a pre-made background image as the canvas. Resolve the path — use the first one that exists:
 
-Before generating, resolve the path:
 ```bash
-WB=$(test -f ~/.claude/skills/generate-image/whiteboard-background.png && echo ~/.claude/skills/generate-image/whiteboard-background.png || echo docs/whiteboard-background.png)
+WB=$(test -f ~/.claude/skills/generate-image/whiteboard-background.png && echo ~/.claude/skills/generate-image/whiteboard-background.png || test -f docs/whiteboard-background.png && echo docs/whiteboard-background.png || echo "")
 ```
-Then use `--input "$WB"` for all whiteboard diagrams.
+
+If `$WB` is not empty, use `--input "$WB"` for all whiteboard diagrams. If empty, generate without `--input` (the prompt will create its own background).
 
 ## Prompt Construction
 
@@ -119,7 +123,11 @@ When the user asks for a diagram, build the prompt by combining:
 ### Example: Architecture Diagram
 
 ```bash
-node scripts/generate-image.js "Draw a hand-sketched technical diagram on this whiteboard using colorful markers. Use a hand-sketched marker style with slightly imperfect lines, hand-drawn arrows with natural curves, and handwritten-looking text in colorful markers. Add small doodles, asterisks, underlines, and emphasis marks like a real whiteboard brainstorming session.
+# Resolve paths first
+GEN_IMG=$(test -f scripts/generate-image.js && echo scripts/generate-image.js || test -f /workspace/group/scripts/generate-image.js && echo /workspace/group/scripts/generate-image.js || echo /workspace/project/scripts/generate-image.js)
+WB=$(test -f ~/.claude/skills/generate-image/whiteboard-background.png && echo ~/.claude/skills/generate-image/whiteboard-background.png || test -f docs/whiteboard-background.png && echo docs/whiteboard-background.png || echo "")
+
+node "$GEN_IMG" "Draw a hand-sketched technical diagram on this whiteboard using colorful markers. Use a hand-sketched marker style with slightly imperfect lines, hand-drawn arrows with natural curves, and handwritten-looking text in colorful markers. Add small doodles, asterisks, underlines, and emphasis marks like a real whiteboard brainstorming session.
 
 Color markers: blue for channels, orange for orchestration, purple for AI components, green for containers.
 
@@ -127,24 +135,22 @@ Title at top: 'System Architecture'
 
 [... specific boxes, connections, labels ...]
 
-Keep it readable but energetic — like a whiteboard sketch from a team planning session. Keep the whiteboard background texture visible." "docs/system-architecture-TIMESTAMP.png" --input docs/whiteboard-background.png --aspect-ratio 16:9
+Keep it readable but energetic — like a whiteboard sketch from a team planning session. Keep the whiteboard background texture visible." "output-$(date +%Y%m%d-%H%M).png" --input "$WB" --aspect-ratio 16:9
 ```
 
 ## Output Location
 
 **CRITICAL: Never overwrite existing images.** Always append a timestamp to the filename so previous versions are preserved.
 
-**Naming format:** `docs/<name>-<YYYYMMDD-HHMM>.png`
+**Naming format:** `<name>-<YYYYMMDD-HHMM>.png`
+
+Save images to the current working directory or a subdirectory. Use `docs/` only if it exists and is writable.
 
 Examples:
-- `docs/data-to-wisdom-pipeline-20260221-1430.png`
-- `docs/openclaw-vs-bastionclaw-security-20260221-1445.png`
+- `system-architecture-20260221-1430.png`
+- `openclaw-vs-bastionclaw-security-20260221-1445.png`
 
-- Architecture diagrams: `docs/<name>-<timestamp>.png`
-- Blog images: user-specified path with timestamp
-- Default: `output-<timestamp>.png` in project root
-
-When the user picks a final version to use in docs, symlink or copy it to the clean name (e.g., `docs/data-to-wisdom-pipeline.png`).
+Default: `output-<timestamp>.png` in the current working directory.
 
 ## Process
 
@@ -152,18 +158,19 @@ When the user picks a final version to use in docs, symlink or copy it to the cl
 1. Understand what the user wants to visualize
 2. Construct the prompt using the style guide above
 3. Choose appropriate aspect ratio (default `16:9` for diagrams)
-4. Generate output path with timestamp: `docs/<name>-$(date +%Y%m%d-%H%M).png`
-5. For whiteboard-style diagrams, use `--input docs/whiteboard-background.png` to draw on the consistent background:
-   `node scripts/generate-image.js "<prompt>" "<path>" --input docs/whiteboard-background.png -ar <ratio>`
-   For non-whiteboard images (thumbnails, photos, etc.), generate without `--input`:
-   `node scripts/generate-image.js "<prompt>" "<path>" -ar <ratio>`
-6. Read the generated image to verify quality
-7. If the user wants it linked in docs, update the relevant `.md` file
+4. Resolve script and whiteboard background paths (see Usage and Whiteboard Background sections)
+5. Generate output path with timestamp: `<name>-$(date +%Y%m%d-%H%M).png`
+6. For whiteboard-style diagrams with background available:
+   `node "$GEN_IMG" "<prompt>" "<path>" --input "$WB" -ar <ratio>`
+   For non-whiteboard images (thumbnails, photos, etc.) or if no background available:
+   `node "$GEN_IMG" "<prompt>" "<path>" -ar <ratio>`
+7. Read the generated image to verify quality
+8. If the user wants it linked in docs, update the relevant `.md` file
 
 ### Editing an Existing Image
 1. Identify the source image to edit (use the most recent timestamped version)
 2. Write a focused prompt describing only the change (not the whole image)
 3. Generate a new output path with timestamp (never overwrite the source)
-4. Run `node scripts/generate-image.js "<edit prompt>" "<path>" --input <source-image>`
+4. Run `node "$GEN_IMG" "<edit prompt>" "<path>" --input <source-image>`
 5. Read the edited image to verify the change was applied
 6. If unsatisfied, iterate with a more specific prompt
