@@ -29,6 +29,8 @@ import { RegisteredGroup } from './types.js';
 export interface IpcDeps {
   sendMessage: (jid: string, text: string) => Promise<void>;
   sendWebhookMessage?: (jid: string, text: string, sender: string) => Promise<void>;
+  sendImage?: (jid: string, imagePath: string, caption?: string) => Promise<void>;
+  sendWebhookImage?: (jid: string, imagePath: string, caption: string, sender: string) => Promise<void>;
   registeredGroups: () => Record<string, RegisteredGroup>;
   registerGroup: (jid: string, group: RegisteredGroup) => void;
   registerWebhook?: (jid: string, url: string) => void;
@@ -40,6 +42,14 @@ export interface IpcDeps {
     availableGroups: AvailableGroup[],
     registeredJids: Set<string>,
   ) => void;
+}
+
+/** Resolve a container path (/workspace/group/foo.png) to the host path (groups/{folder}/foo.png) */
+function resolveContainerPath(containerPath: string, groupFolder: string): string {
+  const stripped = containerPath.replace(/^\/workspace\/group\//, '');
+  return stripped !== containerPath
+    ? path.join(GROUPS_DIR, groupFolder, stripped)
+    : containerPath;
 }
 
 let ipcWatcherRunning = false;
@@ -94,8 +104,37 @@ export function startIpcWatcher(deps: IpcDeps): void {
                 ) {
                   // Strip <internal>...</internal> blocks — agent reasoning not for end users
                   const text = data.text.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
-                  if (!text) {
+                  if (!text && !data.image) {
                     logger.debug({ chatJid: data.chatJid, sourceGroup }, 'IPC message suppressed (internal-only)');
+                  } else if (data.image) {
+                    // Resolve container path to host path
+                    const hostImagePath = resolveContainerPath(data.image, sourceGroup);
+                    if (fs.existsSync(hostImagePath)) {
+                      if (data.sender && deps.sendWebhookImage) {
+                        await deps.sendWebhookImage(data.chatJid, hostImagePath, text, data.sender);
+                      } else if (deps.sendImage) {
+                        await deps.sendImage(data.chatJid, hostImagePath, text || undefined);
+                      } else if (text) {
+                        // Fallback: send text only
+                        await deps.sendMessage(data.chatJid, `${ASSISTANT_NAME}: ${text}`);
+                      }
+                      logger.info(
+                        { chatJid: data.chatJid, sourceGroup, image: hostImagePath },
+                        'IPC image message sent',
+                      );
+                    } else {
+                      logger.warn(
+                        { chatJid: data.chatJid, sourceGroup, image: data.image, resolved: hostImagePath },
+                        'IPC image file not found, sending text only',
+                      );
+                      if (text) {
+                        if (data.sender && deps.sendWebhookMessage) {
+                          await deps.sendWebhookMessage(data.chatJid, text, data.sender);
+                        } else {
+                          await deps.sendMessage(data.chatJid, `${ASSISTANT_NAME}: ${text}`);
+                        }
+                      }
+                    }
                   } else if (data.sender && deps.sendWebhookMessage) {
                     await deps.sendWebhookMessage(data.chatJid, text, data.sender);
                     logger.info(

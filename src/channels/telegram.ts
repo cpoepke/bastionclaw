@@ -1,4 +1,4 @@
-import { Bot } from "grammy";
+import { Bot, InputFile } from "grammy";
 
 import {
   ASSISTANT_NAME,
@@ -256,6 +256,23 @@ export class TelegramChannel implements Channel {
       this.bot.stop();
       this.bot = null;
       logger.info("Telegram bot stopped");
+    }
+  }
+
+  async sendImage(jid: string, imagePath: string, caption?: string): Promise<void> {
+    if (!this.bot) {
+      logger.warn("Telegram bot not initialized");
+      return;
+    }
+
+    try {
+      const numericId = jid.replace(/^tg:/, "");
+      await this.bot.api.sendPhoto(numericId, new InputFile(imagePath), {
+        caption: caption || undefined,
+      });
+      logger.info({ jid, imagePath }, "Telegram image sent");
+    } catch (err) {
+      logger.error({ jid, imagePath, err }, "Failed to send Telegram image");
     }
   }
 

@@ -286,6 +286,44 @@ export class DiscordChannel implements Channel {
     }
   }
 
+  async sendImage(jid: string, imagePath: string, caption?: string): Promise<void> {
+    if (!this.client) {
+      logger.warn('Discord client not initialized');
+      return;
+    }
+
+    try {
+      const channelId = jid.replace(/^dc:/, '');
+      const channel = await this.client.channels.fetch(channelId);
+
+      if (!channel || !('send' in channel)) {
+        logger.warn({ jid }, 'Discord channel not found or not text-based');
+        return;
+      }
+
+      await (channel as TextChannel).send({ content: caption || '', files: [imagePath] });
+      logger.info({ jid, imagePath }, 'Discord image sent');
+    } catch (err) {
+      logger.error({ jid, imagePath, err }, 'Failed to send Discord image');
+    }
+  }
+
+  async sendImageAsWebhook(jid: string, imagePath: string, caption: string, sender: string): Promise<void> {
+    const wh = this.webhookMap.get(jid) || this.defaultWebhook;
+    if (!wh) {
+      await this.sendImage(jid, imagePath, `${sender}: ${caption}`);
+      return;
+    }
+
+    await wh.send({
+      content: caption || '',
+      username: sender,
+      avatarURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(sender)}&background=random&size=128`,
+      files: [imagePath],
+    });
+    logger.info({ jid, sender, imagePath }, 'Discord webhook image sent');
+  }
+
   async setTyping(jid: string, isTyping: boolean): Promise<void> {
     if (!this.client || !isTyping) return;
     try {

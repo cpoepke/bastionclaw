@@ -704,6 +704,19 @@ async function main(): Promise<void> {
           }
         }
       : undefined,
+    sendImage: async (jid, imagePath, caption) => {
+      const ch = findChannel(channels, jid);
+      if (ch?.sendImage) await ch.sendImage(jid, imagePath, caption);
+      else if (ch) await ch.sendMessage(jid, caption || '[Image]');
+    },
+    sendWebhookImage: DISCORD_BOT_TOKEN
+      ? async (jid, imagePath, caption, sender) => {
+          const ch = findChannel(channels, jid);
+          if (ch instanceof DiscordChannel) await ch.sendImageAsWebhook(jid, imagePath, caption, sender);
+          else if (ch?.sendImage) await ch.sendImage(jid, imagePath, `${sender}: ${caption}`);
+          else if (ch) await ch.sendMessage(jid, `${sender}: ${caption || '[Image]'}`);
+        }
+      : undefined,
     registeredGroups: () => registeredGroups,
     registerGroup,
     registerWebhook: (jid, url) => {

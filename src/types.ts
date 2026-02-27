@@ -86,6 +86,8 @@ export interface Channel {
   isConnected(): boolean;
   ownsJid(jid: string): boolean;
   disconnect(): Promise<void>;
+  // Optional: send an image with an optional text caption.
+  sendImage?(jid: string, imagePath: string, caption?: string): Promise<void>;
   // Optional: typing indicator. Channels that support it implement it.
   setTyping?(jid: string, isTyping: boolean): Promise<void>;
   // Whether to prefix outbound messages with the assistant name.
