@@ -12,7 +12,7 @@ Generate images using Gemini's image model via `scripts/generate-image.js`. Spec
 First, resolve the script path (it may be in different locations depending on environment):
 
 ```bash
-GEN_IMG=$(test -f scripts/generate-image.js && echo scripts/generate-image.js || test -f /workspace/group/scripts/generate-image.js && echo /workspace/group/scripts/generate-image.js || echo /workspace/project/scripts/generate-image.js)
+GEN_IMG=$(test -f ~/.claude/skills/generate-image/generate-image.js && echo ~/.claude/skills/generate-image/generate-image.js || test -f scripts/generate-image.js && echo scripts/generate-image.js || test -f /workspace/group/scripts/generate-image.js && echo /workspace/group/scripts/generate-image.js || echo /workspace/project/scripts/generate-image.js)
 ```
 
 ```bash
@@ -124,7 +124,7 @@ When the user asks for a diagram, build the prompt by combining:
 
 ```bash
 # Resolve paths first
-GEN_IMG=$(test -f scripts/generate-image.js && echo scripts/generate-image.js || test -f /workspace/group/scripts/generate-image.js && echo /workspace/group/scripts/generate-image.js || echo /workspace/project/scripts/generate-image.js)
+GEN_IMG=$(test -f ~/.claude/skills/generate-image/generate-image.js && echo ~/.claude/skills/generate-image/generate-image.js || test -f scripts/generate-image.js && echo scripts/generate-image.js || test -f /workspace/group/scripts/generate-image.js && echo /workspace/group/scripts/generate-image.js || echo /workspace/project/scripts/generate-image.js)
 WB=$(test -f ~/.claude/skills/generate-image/whiteboard-background.png && echo ~/.claude/skills/generate-image/whiteboard-background.png || test -f docs/whiteboard-background.png && echo docs/whiteboard-background.png || echo "")
 
 node "$GEN_IMG" "Draw a hand-sketched technical diagram on this whiteboard using colorful markers. Use a hand-sketched marker style with slightly imperfect lines, hand-drawn arrows with natural curves, and handwritten-looking text in colorful markers. Add small doodles, asterisks, underlines, and emphasis marks like a real whiteboard brainstorming session.
