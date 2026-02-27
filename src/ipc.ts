@@ -44,12 +44,20 @@ export interface IpcDeps {
   ) => void;
 }
 
-/** Resolve a container path (/workspace/group/foo.png) to the host path (groups/{folder}/foo.png) */
+/** Resolve a container path to the host path.
+ *  /workspace/group/foo.png → groups/{folder}/foo.png
+ *  foo.png (bare filename)  → groups/{folder}/foo.png
+ */
 function resolveContainerPath(containerPath: string, groupFolder: string): string {
   const stripped = containerPath.replace(/^\/workspace\/group\//, '');
-  return stripped !== containerPath
-    ? path.join(GROUPS_DIR, groupFolder, stripped)
-    : containerPath;
+  if (stripped !== containerPath) {
+    return path.join(GROUPS_DIR, groupFolder, stripped);
+  }
+  // Bare filename or relative path — resolve relative to group dir
+  if (!path.isAbsolute(containerPath)) {
+    return path.join(GROUPS_DIR, groupFolder, containerPath);
+  }
+  return containerPath;
 }
 
 let ipcWatcherRunning = false;

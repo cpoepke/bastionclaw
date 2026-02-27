@@ -60,6 +60,7 @@ let lastTimestamp = '';
 let sessions: Record<string, string> = {};
 let registeredGroups: Record<string, RegisteredGroup> = {};
 let lastAgentTimestamp: Record<string, string> = {};
+let consecutiveErrors: Record<string, number> = {};
 let messageLoopRunning = false;
 
 let whatsapp: WhatsAppChannel;
@@ -278,12 +279,35 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     // If we already sent output to the user, don't roll back the cursor —
     // the user got their response and re-processing would send duplicates.
     if (outputSentToUser) {
+      consecutiveErrors[chatJid] = 0;
       logger.warn({ group: group.name }, 'Agent error after output was sent, skipping cursor rollback to prevent duplicates');
       return true;
     }
 
-    // Notify the user that something went wrong so they don't wait in silence.
-    if (channel) {
+    consecutiveErrors[chatJid] = (consecutiveErrors[chatJid] || 0) + 1;
+    const errorCount = consecutiveErrors[chatJid];
+
+    if (errorCount >= 5) {
+      // Stop retrying — advance cursor so these messages are consumed.
+      // Prevents infinite retry loops from persistent errors (e.g. expired OAuth token).
+      logger.error(
+        { group: group.name, errorCount },
+        'Max consecutive errors reached, advancing cursor to stop retry loop',
+      );
+      if (channel) {
+        try {
+          await channel.sendMessage(chatJid, '⚠️ Failed to process after multiple retries. Skipping — send your message again to retry.');
+        } catch (notifyErr) {
+          logger.warn({ group: group.name, err: notifyErr }, 'Failed to send skip notification');
+        }
+      }
+      consecutiveErrors[chatJid] = 0;
+      // Don't roll back — cursor stays advanced, messages are consumed
+      return true;
+    }
+
+    // Notify the user only on first failure
+    if (errorCount === 1 && channel) {
       try {
         await channel.sendMessage(chatJid, '⚠️ Something went wrong processing that request. The agent will retry automatically.');
       } catch (notifyErr) {
@@ -294,10 +318,11 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     // Roll back cursor so retries can re-process these messages
     lastAgentTimestamp[chatJid] = previousCursor;
     saveState();
-    logger.warn({ group: group.name }, 'Agent error, rolled back message cursor for retry');
+    logger.warn({ group: group.name, errorCount }, 'Agent error, rolled back message cursor for retry');
     return false;
   }
 
+  consecutiveErrors[chatJid] = 0;
   return true;
 }
 

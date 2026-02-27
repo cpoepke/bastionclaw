@@ -18,6 +18,16 @@ Your output is sent to the user or group.
 
 You also have `mcp__bastionclaw__send_message` which sends a message immediately while you're still working. This is useful when you want to acknowledge a request before starting longer work.
 
+### Sending images
+
+To share an image in the chat, use `send_message` with the `image` parameter set to the file path:
+
+```
+mcp__bastionclaw__send_message(text: "Here's your image!", image: "bigfoot.png")
+```
+
+**Important:** Markdown image syntax (`![alt](file.png)`) does NOT work — it renders as plain text. You MUST use the `image` parameter on `send_message` to actually display an image. The `text` field becomes the caption. Always use `send_message` with `image` after generating or finding an image the user wants to see.
+
 ### Internal thoughts
 
 If part of your output is internal reasoning rather than something for the user, wrap it in `<internal>` tags:
