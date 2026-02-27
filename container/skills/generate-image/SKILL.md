@@ -51,36 +51,44 @@ Default to `16:9` for technical diagrams. Ask the user if unclear.
 
 ## Project Visual Style
 
-All project diagrams follow a consistent brand. **Always include these style instructions in the prompt:**
+All project diagrams use a **whiteboard sketch style** — hand-drawn feel with colorful markers on a white/off-white background, like a real brainstorming session.
 
 ### Background
-- Dark background: `#1a1a2e` (deep navy)
-- Subtle geometric mesh or grid pattern in the background (very low opacity)
+- White or off-white background like a real whiteboard
+- Subtle marker texture / dry-erase feel
 
-### Color Palette (box/element fills)
-| Color | Hex | Role |
-|-------|-----|------|
-| Teal | `#00d4aa` | Primary actions, entry points, data sources |
-| Orange | `#ff6b35` | Orchestration, file systems, web interfaces |
-| Purple | `#7c3aed` | AI/agent components, processing, databases |
-| Green | `#22c55e` | Agent containers, active processes |
-| Red | `#ef4444` | Deduplication, destructive/merge operations |
-| Yellow | `#eab308` | API endpoints, web services |
-| Cyan | `#06b6d4` | Indexes, search, semantic operations |
+### Color Palette (marker colors)
+| Color | Role |
+|-------|------|
+| Blue | Messaging channels, data sources, entry points |
+| Orange / Red | Orchestration, danger, warnings, attack flows |
+| Purple | AI/agent components, processing, databases |
+| Green | Containers, active processes, security, safe elements |
+| Red | Destructive operations, vulnerabilities, blocked items |
+| Yellow | API endpoints, web services, highlights |
+| Cyan / Teal | Indexes, search, semantic operations |
+| Black | Text, arrows, annotations, connections |
 
-### Typography & Elements
-- White text (`#ffffff`) for all labels and descriptions
-- Bold sans-serif headers for box titles
-- Lighter weight for subtitles and descriptions
-- Rounded corners on all boxes (modern flat design)
-- Clean directional arrows (not hand-drawn) connecting stages
-- Subtle drop shadows for depth
+### Drawing Style
+- Hand-sketched boxes with slightly imperfect lines and rounded corners
+- Hand-drawn arrows with slight curves and imperfections
+- Text that looks like handwritten marker in different colors
+- Small doodles, asterisks, underlines, and emphasis marks
+- Exclamation marks or stars next to key features
+- Lock icons near security features
+- Cloud shapes around AI components
+- Annotations that look like whiteboard notes with arrows
+- Circled keywords and underlined important terms
 
 ### Layout
 - Left-to-right or top-to-bottom flow
 - Clear stage/step numbering when applicable
-- Legend box in corner when using 4+ colors
-- Title in large bold text at the top center
+- Annotations and callout notes in margins (like a real whiteboard)
+- Title in large bold marker text at the top
+
+## Whiteboard Background
+
+All whiteboard-style diagrams use a pre-made background image as the canvas: `docs/whiteboard-background.png`. This ensures consistent texture across all diagrams. Use `--input` mode to draw on top of it.
 
 ## Prompt Construction
 
@@ -88,30 +96,30 @@ When the user asks for a diagram, build the prompt by combining:
 
 1. **Style preamble** (always include):
    ```
-   Create a clean, professional technical architecture diagram on a dark background (#1a1a2e) with subtle geometric patterns. Use modern flat design with rounded boxes, subtle gradients, and clean connecting arrows. White text on colored boxes.
+   Draw a hand-sketched technical diagram on this whiteboard using colorful markers. Use a hand-sketched marker style with slightly imperfect lines, hand-drawn arrows with natural curves, and handwritten-looking text in colorful markers. Add small doodles, asterisks, underlines, and emphasis marks like a real whiteboard brainstorming session. Include annotations with arrows, circled keywords, and exclamation marks near key features. Keep the whiteboard background texture visible.
    ```
 
-2. **Color assignments** — map each component type to the palette above based on its role
+2. **Color assignments** — map each component type to the marker palette above based on its role
 
 3. **Content** — the specific boxes, labels, arrows, and relationships the user wants
 
 4. **Layout instruction**:
    ```
-   Keep it minimal and readable. No unnecessary decoration. Use clear directional arrows between stages.
+   Keep it readable but energetic — like a whiteboard sketch from a team planning session. Use hand-drawn arrows between stages. Add small annotation notes in the margins for key insights.
    ```
 
 ### Example: Architecture Diagram
 
-```
-Create a clean, professional technical architecture diagram on a dark background (#1a1a2e) with subtle geometric patterns. Use modern flat design with rounded boxes, subtle gradients, and clean connecting arrows. White text on colored boxes.
+```bash
+node scripts/generate-image.js "Draw a hand-sketched technical diagram on this whiteboard using colorful markers. Use a hand-sketched marker style with slightly imperfect lines, hand-drawn arrows with natural curves, and handwritten-looking text in colorful markers. Add small doodles, asterisks, underlines, and emphasis marks like a real whiteboard brainstorming session.
 
-Color palette: teal (#00d4aa) for data sources, orange (#ff6b35) for orchestration, purple (#7c3aed) for AI processing, green (#22c55e) for containers.
+Color markers: blue for channels, orange for orchestration, purple for AI components, green for containers.
 
 Title at top: 'System Architecture'
 
 [... specific boxes, connections, labels ...]
 
-Keep it minimal and readable. No unnecessary decoration.
+Keep it readable but energetic — like a whiteboard sketch from a team planning session. Keep the whiteboard background texture visible." "docs/system-architecture-TIMESTAMP.png" --input docs/whiteboard-background.png --aspect-ratio 16:9
 ```
 
 ## Output Location
@@ -137,7 +145,10 @@ When the user picks a final version to use in docs, symlink or copy it to the cl
 2. Construct the prompt using the style guide above
 3. Choose appropriate aspect ratio (default `16:9` for diagrams)
 4. Generate output path with timestamp: `docs/<name>-$(date +%Y%m%d-%H%M).png`
-5. Run `node scripts/generate-image.js "<prompt>" "<path>" -ar <ratio>`
+5. For whiteboard-style diagrams, use `--input docs/whiteboard-background.png` to draw on the consistent background:
+   `node scripts/generate-image.js "<prompt>" "<path>" --input docs/whiteboard-background.png -ar <ratio>`
+   For non-whiteboard images (thumbnails, photos, etc.), generate without `--input`:
+   `node scripts/generate-image.js "<prompt>" "<path>" -ar <ratio>`
 6. Read the generated image to verify quality
 7. If the user wants it linked in docs, update the relevant `.md` file
 
