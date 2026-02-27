@@ -88,7 +88,15 @@ All project diagrams use a **whiteboard sketch style** — hand-drawn feel with 
 
 ## Whiteboard Background
 
-All whiteboard-style diagrams use a pre-made background image as the canvas: `docs/whiteboard-background.png`. This ensures consistent texture across all diagrams. Use `--input` mode to draw on top of it.
+All whiteboard-style diagrams use a pre-made background image as the canvas. The background is bundled with this skill at multiple locations — use the first one that exists:
+1. `~/.claude/skills/generate-image/whiteboard-background.png` (container agents)
+2. `docs/whiteboard-background.png` (host/project root)
+
+Before generating, resolve the path:
+```bash
+WB=$(test -f ~/.claude/skills/generate-image/whiteboard-background.png && echo ~/.claude/skills/generate-image/whiteboard-background.png || echo docs/whiteboard-background.png)
+```
+Then use `--input "$WB"` for all whiteboard diagrams.
 
 ## Prompt Construction
 
