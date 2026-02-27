@@ -1,6 +1,6 @@
 {
   "name": "bastionclaw-agent-runner",
-  "version": "2026.2.26",
+  "version": "2026.2.27",
   "type": "module",
   "description": "Container-side agent runner for BastionClaw",
   "main": "dist/index.js",
