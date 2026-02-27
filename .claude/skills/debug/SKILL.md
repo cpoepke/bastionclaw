@@ -344,6 +344,46 @@ sqlite3 store/messages.db "SELECT substr(text,1,80), category, first_seen FROM i
 ```
 
 
+## Detailed Agent Tool Call Transcript
+
+Container logs only show message types (`type=assistant`, `type=user`), not what the agent actually did. To see every tool call, skill invocation, bash command, and file edit, parse the session JSONL transcript:
+
+### Find the session transcript
+```bash
+find data/sessions/{group-folder}/.claude/projects -name "*.jsonl"
+# e.g. data/sessions/discord-research/.claude/projects/-workspace-group/c735d9b8-....jsonl
+```
+
+### Parse tool calls from transcript
+```bash
+cat data/sessions/{group-folder}/.claude/projects/-workspace-group/{session-id}.jsonl | python3 -c "
+import json, sys
+for line in sys.stdin:
+    msg = json.loads(line)
+    t = msg.get('type','')
+    if t in ('user','human'):
+        content = msg.get('message',{}).get('content','')
+        if isinstance(content, list):
+            for c in content:
+                if c.get('type') == 'text': print(f'USER: {c[\"text\"][:200]}')
+        elif isinstance(content, str): print(f'USER: {content[:200]}')
+    elif t == 'assistant':
+        content = msg.get('message',{}).get('content','')
+        if isinstance(content, list):
+            for c in content:
+                if c.get('type') == 'text' and c['text'].strip(): print(f'ASSISTANT: {c[\"text\"][:150]}')
+                elif c.get('type') == 'tool_use': print(f'TOOL_CALL: {c.get(\"name\",\"\")} => {json.dumps(c.get(\"input\",{}))[:300]}')
+    elif t == 'tool_result':
+        content = msg.get('message',{}).get('content','')
+        if isinstance(content, list):
+            for c in content:
+                if c.get('type') == 'text': print(f'TOOL_RESULT: {c[\"text\"][:200]}')
+        elif isinstance(content, str): print(f'TOOL_RESULT: {content[:200]}')
+"
+```
+
+This reveals exactly what happened: which skills were invoked, what bash commands ran, what files were read/written, and what the agent told the user. Essential for debugging unexpected agent behavior (e.g. agent writing its own scripts instead of using bundled ones).
+
 ## Quick Diagnostic Script
 
 Run this to check common issues:
