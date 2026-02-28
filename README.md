@@ -26,7 +26,9 @@ All credit for the core architecture, container isolation model, skills system, 
 
 The authors of [NanoClaw](https://github.com/qwibitai/nanoclaw) built it as a lightweight, secure alternative to [OpenClaw](https://github.com/openclaw/openclaw). OpenClaw has 52+ modules, 8 config management files, 45+ dependencies, and abstractions for 15 channel providers. Security is application-level (allowlists, pairing codes) rather than OS isolation. Everything runs in one Node process with shared memory.
 
-NanoClaw gives you the same core functionality in a codebase you can understand in 8 minutes. One process. A handful of files. Agents run in actual Linux containers with filesystem isolation, not behind permission checks. BastionClaw builds on this and takes it further.
+NanoClaw gives you the same core functionality in a codebase you can understand in 8 minutes. One process. A handful of files. Agents run in actual Linux containers with filesystem isolation, not behind permission checks.
+
+BastionClaw builds on this and takes it further.
 
 <p align="center">
   <img src="docs/openclaw-vs-bastionclaw-security-20260221-1945.png" alt="OpenClaw vs BastionClaw Security Model" width="600">
