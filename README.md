@@ -9,7 +9,7 @@
 ## About This Fork
 
 **Support**
-For more support and information about this repo, join the free mentoring of [Dr. Allen Harper](https://allenharper.com).  Once inside, see the Secure Vibe Coding Masterclass, where we are engaged in discussions on this and other similar topics.
+For more support and information about this repo, join the free mentoring of [Dr. Allen Harper](https://allenharper.com).  Once inside, see the Secure Vibe Coding Masterclass, where we are engaged in discussions on this and other similar topics. Follow Dr. Allen Harper on [YouTube](https://www.youtube.com/@drallenharper) and [X](https://x.com/allenharper).
 
 **BastionClaw** (formerly NanoClaw Hard Shell) is a fork of [NanoClaw](https://github.com/qwibitai/nanoclaw), an awesome lightweight personal Claude assistant. This fork makes the following changes:
 
