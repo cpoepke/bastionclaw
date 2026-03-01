@@ -46,6 +46,7 @@ import {
 import { isValidGroupFolder, resolveGroupFolderPath } from './group-folder.js';
 import { GroupQueue } from './group-queue.js';
 import { startIpcWatcher } from './ipc.js';
+import { sanitizePrompt } from './prompt-injection.js';
 import { findChannel, formatMessages, formatOutbound } from './router.js';
 import { startSchedulerLoop } from './task-scheduler.js';
 import { Channel, NewMessage, RegisteredGroup } from './types.js';
@@ -185,15 +186,35 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
 
   if (filteredMessages.length === 0) return true;
 
+  // Sanitize messages for prompt injection
+  for (const msg of filteredMessages) {
+    const result = sanitizePrompt(msg.content);
+    if (!result.safe) {
+      logger.warn({ chatJid, sender: msg.sender_name, reason: result.reason, blocked: result.blocked }, 'Prompt injection detected');
+      if (result.blocked) {
+        const channel = findChannel(channels, chatJid);
+        if (channel) {
+          const notice = `⚠️ Message from ${msg.sender_name} was blocked: ${result.reason}`;
+          await channel.sendMessage(chatJid, notice);
+        }
+      }
+      msg.content = result.sanitized;
+    }
+  }
+
+  // Drop fully blocked messages (content replaced with rejection notice)
+  const passedMessages = filteredMessages.filter((m) => !m.content.startsWith('[Message blocked:'));
+  if (passedMessages.length === 0) return true;
+
   // For non-main groups, check if trigger is required and present
   if (!isMainGroup && group.requiresTrigger !== false) {
-    const hasTrigger = filteredMessages.some((m) =>
+    const hasTrigger = passedMessages.some((m) =>
       TRIGGER_PATTERN.test(m.content.trim()),
     );
     if (!hasTrigger) return true;
   }
 
-  const prompt = formatMessages(filteredMessages);
+  const prompt = formatMessages(passedMessages);
 
   // Advance cursor so the piping path in startMessageLoop won't re-fetch
   // these messages. Save the old cursor so we can roll back on error.
@@ -205,8 +226,8 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   logger.info(
     {
       group: group.name,
-      messageCount: filteredMessages.length,
-      prompt: filteredMessages[0]?.content,
+      messageCount: passedMessages.length,
+      prompt: passedMessages[0]?.content,
     },
     'Processing messages',
   );

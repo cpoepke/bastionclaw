@@ -9,6 +9,8 @@
 | Container agents | Sandboxed | Isolated execution environment |
 | Channel messages | User input | Potential prompt injection |
 
+For prompt injection risks and user responsibilities, see [PROMPT-INJECTION.md](PROMPT-INJECTION.md).
+
 ## Security Boundaries
 
 ### 1. Container Isolation (Primary Boundary)
@@ -111,7 +113,8 @@ const allowedVars = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'TRANSCRIPT
 │  Inbound Messages (potentially malicious)                         │
 └────────────────────────────────┬─────────────────────────────────┘
                                  │
-                                 ▼ Trigger check, input escaping
+                                 ▼ Prompt injection sanitization,
+                                   trigger check, input escaping
 ┌──────────────────────────────────────────────────────────────────┐
 │                     HOST PROCESS (TRUSTED)                        │
 │  • Message routing                                                │

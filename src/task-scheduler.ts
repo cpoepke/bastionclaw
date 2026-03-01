@@ -22,6 +22,7 @@ import {
 } from './db.js';
 import { GroupQueue } from './group-queue.js';
 import { logger } from './logger.js';
+import { sanitizePrompt } from './prompt-injection.js';
 import { RegisteredGroup, ScheduledTask } from './types.js';
 
 export interface SchedulerDependencies {
@@ -124,11 +125,31 @@ async function runTask(
     }, TASK_CLOSE_DELAY_MS);
   };
 
+  // Sanitize scheduled task prompt
+  const promptCheck = sanitizePrompt(task.prompt);
+  if (!promptCheck.safe) {
+    logger.warn({ taskId: task.id, reason: promptCheck.reason, blocked: promptCheck.blocked }, 'Prompt injection detected in scheduled task');
+  }
+  if (promptCheck.blocked) {
+    const blockError = `Task prompt blocked: ${promptCheck.reason}`;
+    logTaskRun({
+      task_id: task.id,
+      run_at: new Date().toISOString(),
+      duration_ms: Date.now() - startTime,
+      status: 'error',
+      result: null,
+      error: blockError,
+    });
+    await deps.sendMessage(task.chat_jid, `⚠️ Scheduled task "${task.id}" blocked: ${promptCheck.reason}`);
+    return;
+  }
+  const sanitizedPrompt = promptCheck.sanitized;
+
   try {
     const output = await runContainerAgent(
       group,
       {
-        prompt: task.prompt,
+        prompt: sanitizedPrompt,
         sessionId,
         groupFolder: task.group_folder,
         chatJid: task.chat_jid,
