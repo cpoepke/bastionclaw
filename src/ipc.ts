@@ -631,6 +631,13 @@ export async function processTaskIpc(
       const requestId = data.requestId;
       if (!requestId || !data.insightText || !data.sourceUrl || !data.sourceType) break;
 
+      // Reject local file paths — agent must provide canonical URLs
+      if (data.sourceUrl.startsWith('/') || data.sourceUrl.startsWith('workspace/')) {
+        logger.warn({ sourceUrl: data.sourceUrl, sourceGroup }, 'Rejected insight source with local file path — agent must use canonical URL (e.g. YouTube watch URL)');
+        writeIpcResponse(sourceGroup, requestId, { error: 'source_url must be a canonical URL (e.g. https://www.youtube.com/watch?v=...), not a local file path. Check metadata.json for the video_id or link field.' });
+        break;
+      }
+
       const now = new Date().toISOString();
       const sourceHash = hashSourceUrl(data.sourceUrl);
       const insightId = crypto.randomUUID();
@@ -682,6 +689,13 @@ export async function processTaskIpc(
     case 'insight_link': {
       const requestId = data.requestId;
       if (!requestId || !data.insightId || !data.sourceUrl || !data.sourceType) break;
+
+      // Reject local file paths — agent must provide canonical URLs
+      if (data.sourceUrl.startsWith('/') || data.sourceUrl.startsWith('workspace/')) {
+        logger.warn({ sourceUrl: data.sourceUrl, sourceGroup }, 'Rejected insight link with local file path — agent must use canonical URL');
+        writeIpcResponse(sourceGroup, requestId, { error: 'source_url must be a canonical URL (e.g. https://www.youtube.com/watch?v=...), not a local file path. Check metadata.json for the video_id or link field.' });
+        break;
+      }
 
       const now = new Date().toISOString();
       const sourceHash = hashSourceUrl(data.sourceUrl);

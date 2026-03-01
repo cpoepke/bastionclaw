@@ -480,7 +480,7 @@ server.tool(
   {
     text: z.string().describe('Bold thesis statement — a short, generalizable principle (10-20 words). Should be abstract enough that the same insight from a different source would use the same text.'),
     detail: z.string().optional().describe('2-3 sentences expanding on the thesis with specific context and nuance.'),
-    source_url: z.string().describe('URL or file path of the content source'),
+    source_url: z.string().describe('Canonical URL of the content source. For YouTube videos, MUST be "https://www.youtube.com/watch?v={video_id}" — never a local file path or transcript path. Check the metadata.json for the video_id or link field.'),
     source_title: z.string().optional().describe('Title of the source'),
     source_type: z.enum(['article', 'youtube', 'pdf', 'podcast', 'other']).describe('Type of content source'),
     source_metadata: z.string().optional().describe('JSON string with extra metadata (author, channel, duration, etc.)'),
@@ -515,7 +515,7 @@ server.tool(
   'Link an existing insight to a new source. Use when you find an insight that semantically matches one already in the database. This bumps the source count, making frequently-corroborated insights rise to the top.',
   {
     insight_id: z.string().describe('ID of the existing insight to link'),
-    source_url: z.string().describe('URL or file path of the new source'),
+    source_url: z.string().describe('Canonical URL of the source. For YouTube, MUST be "https://www.youtube.com/watch?v={video_id}" — never a local file path. Check metadata.json for the video_id or link field.'),
     source_title: z.string().optional().describe('Title of the source'),
     source_type: z.enum(['article', 'youtube', 'pdf', 'podcast', 'other']).describe('Type of content source'),
     source_metadata: z.string().optional().describe('JSON string with extra metadata'),
