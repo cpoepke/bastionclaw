@@ -605,6 +605,62 @@ server.tool(
   },
 );
 
+// --- Paperclip API proxy (reaches host localhost via IPC) ---
+
+server.tool(
+  'paperclip_api',
+  `Make an HTTP request to the Paperclip API through the host process. Use this for all Paperclip API calls — the host proxies requests to the Paperclip server on localhost.
+
+Authentication is handled automatically — PAPERCLIP_API_KEY from your environment is injected by the host.
+
+Examples:
+- GET /api/agents/me
+- POST /api/issues/{issueId}/checkout with body {"agentId":"...","expectedStatuses":["todo","backlog","blocked"]}
+- PATCH /api/issues/{issueId} with body {"status":"done","comment":"..."}
+- GET /api/issues/{issueId}/comments`,
+  {
+    method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).describe('HTTP method'),
+    path: z.string().describe('API path starting with /api/ (e.g., "/api/agents/me")'),
+    body: z.string().optional().describe('JSON request body (for POST/PUT/PATCH)'),
+    headers: z.record(z.string(), z.string()).optional().describe('Additional headers (auth is added automatically)'),
+  },
+  async (args) => {
+    if (!args.path.startsWith('/api/')) {
+      return {
+        content: [{ type: 'text' as const, text: 'Path must start with /api/' }],
+        isError: true,
+      };
+    }
+
+    try {
+      const result = await sendIpcRequest({
+        type: 'paperclip_api',
+        method: args.method,
+        path: args.path,
+        body: args.body,
+        headers: args.headers,
+        groupFolder,
+      }, 30000) as { status?: number; body?: string; error?: string };
+
+      if (result.error) {
+        return {
+          content: [{ type: 'text' as const, text: `Paperclip API error: ${result.error}` }],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [{ type: 'text' as const, text: `HTTP ${result.status}\n${result.body}` }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: 'text' as const, text: `Paperclip API request failed: ${err instanceof Error ? err.message : String(err)}` }],
+        isError: true,
+      };
+    }
+  },
+);
+
 // Start the stdio transport
 const transport = new StdioServerTransport();
 await server.connect(transport);

@@ -268,6 +268,11 @@ export async function processTaskIpc(
     // For dedup_insights
     threshold?: number;
     dryRun?: boolean;
+    // For paperclip_api proxy
+    method?: string;
+    path?: string;
+    body?: string;
+    headers?: Record<string, string>;
   },
   sourceGroup: string, // Verified identity from IPC directory
   isMain: boolean, // Verified from directory path
@@ -344,7 +349,9 @@ export async function processTaskIpc(
           nextRun = scheduled.toISOString();
         }
 
-        const taskId = `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const taskId = (typeof data.taskId === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(data.taskId))
+          ? data.taskId
+          : `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const contextMode =
           data.context_mode === 'group' || data.context_mode === 'isolated'
             ? data.context_mode
@@ -769,6 +776,57 @@ export async function processTaskIpc(
         const message = err instanceof Error ? err.message : String(err);
         const stdout = (err as { stdout?: string }).stdout || '';
         writeIpcResponse(sourceGroup, requestId, { ok: false, error: message, output: stdout });
+      }
+      break;
+    }
+
+    case 'paperclip_api': {
+      const requestId = data.requestId;
+      if (!requestId) break;
+
+      const method = (data.method as string || 'GET').toUpperCase();
+      const apiPath = data.path as string;
+      if (!apiPath || !apiPath.startsWith('/api/')) {
+        writeIpcResponse(sourceGroup, requestId, { error: 'Path must start with /api/' });
+        break;
+      }
+
+      const paperclipApiUrl = process.env.PAPERCLIP_API_URL || 'http://127.0.0.1:3101';
+      const paperclipApiKey = process.env.PAPERCLIP_API_KEY || '';
+      const url = `${paperclipApiUrl}${apiPath}`;
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(paperclipApiKey ? { 'Authorization': `Bearer ${paperclipApiKey}` } : {}),
+        ...(data.headers as Record<string, string> || {}),
+      };
+
+      try {
+        const fetchOptions: RequestInit = { method, headers };
+        if (data.body && ['POST', 'PUT', 'PATCH'].includes(method)) {
+          fetchOptions.body = data.body as string;
+        }
+
+        const response = await fetch(url, fetchOptions);
+        const body = await response.text();
+
+        logger.debug(
+          { method, path: apiPath, status: response.status, sourceGroup },
+          'Paperclip API proxy call',
+        );
+
+        writeIpcResponse(sourceGroup, requestId, {
+          status: response.status,
+          body,
+        });
+      } catch (err) {
+        logger.warn(
+          { method, path: apiPath, err, sourceGroup },
+          'Paperclip API proxy error',
+        );
+        writeIpcResponse(sourceGroup, requestId, {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
       break;
     }
