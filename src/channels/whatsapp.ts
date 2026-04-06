@@ -6,10 +6,13 @@ import makeWASocket, {
   Browsers,
   DisconnectReason,
   WASocket,
+  downloadMediaMessage,
   fetchLatestWaWebVersion,
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
 } from '@whiskeysockets/baileys';
+
+import { transcribeAudio } from '../transcribe.js';
 
 import { STORE_DIR } from '../config.js';
 import {
@@ -146,7 +149,7 @@ export class WhatsAppChannel implements Channel {
 
     this.sock.ev.on('creds.update', saveCreds);
 
-    this.sock.ev.on('messages.upsert', ({ messages }) => {
+    this.sock.ev.on('messages.upsert', async ({ messages }) => {
       for (const msg of messages) {
         if (!msg.message) continue;
         const rawJid = msg.key.remoteJid;
@@ -165,12 +168,26 @@ export class WhatsAppChannel implements Channel {
         // Only deliver full message for registered groups
         const groups = this.opts.registeredGroups();
         if (groups[chatJid]) {
-          const content =
+          let content =
             msg.message?.conversation ||
             msg.message?.extendedTextMessage?.text ||
             msg.message?.imageMessage?.caption ||
             msg.message?.videoMessage?.caption ||
             '';
+
+          if (!content && msg.message?.audioMessage && process.env.GROQ_API_KEY) {
+            try {
+              const start = Date.now();
+              const buffer = await downloadMediaMessage(msg, 'buffer', {}) as Buffer;
+              const transcript = await transcribeAudio(buffer);
+              content = '[Voice] ' + transcript;
+              logger.info({ duration: Date.now() - start }, 'Voice message transcribed');
+            } catch (err) {
+              logger.warn({ err }, 'Voice transcription failed');
+              content = '[Voice message - transcription failed]';
+            }
+          }
+
           const sender = msg.key.participant || msg.key.remoteJid || '';
           const senderName = msg.pushName || sender.split('@')[0];
 

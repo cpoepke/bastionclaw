@@ -68,10 +68,18 @@ function createFakeSocket() {
 
 let fakeSocket: ReturnType<typeof createFakeSocket>;
 
+// Mock transcribe module
+vi.mock('../transcribe.js', () => ({
+  transcribeAudio: vi.fn().mockResolvedValue(''),
+}));
+
 // Mock Baileys
 vi.mock('@whiskeysockets/baileys', () => {
   return {
     default: vi.fn(() => fakeSocket),
+    Browsers: {
+      macOS: vi.fn(() => ['Chrome', 'Desktop', '0.0.0']),
+    },
     DisconnectReason: {
       loggedOut: 401,
       badSession: 500,
@@ -81,6 +89,8 @@ vi.mock('@whiskeysockets/baileys', () => {
       timedOut: 408,
       restartRequired: 515,
     },
+    downloadMediaMessage: vi.fn().mockResolvedValue(Buffer.from('')),
+    fetchLatestWaWebVersion: vi.fn().mockResolvedValue({ version: [2, 2413, 51] }),
     makeCacheableSignalKeyStore: vi.fn((keys: unknown) => keys),
     useMultiFileAuthState: vi.fn().mockResolvedValue({
       state: {
@@ -94,6 +104,8 @@ vi.mock('@whiskeysockets/baileys', () => {
 
 import { WhatsAppChannel, WhatsAppChannelOpts } from './whatsapp.js';
 import { getLastGroupSync, updateChatName, setLastGroupSync } from '../db.js';
+import { downloadMediaMessage } from '@whiskeysockets/baileys';
+import { transcribeAudio } from '../transcribe.js';
 
 // --- Test helpers ---
 
@@ -480,7 +492,10 @@ describe('WhatsAppChannel', () => {
       );
     });
 
-    it('handles message with no extractable text (e.g. voice note without caption)', async () => {
+    it('handles voice note without GROQ_API_KEY set (passes empty content)', async () => {
+      const savedKey = process.env.GROQ_API_KEY;
+      delete process.env.GROQ_API_KEY;
+
       const opts = createTestOpts();
       const channel = new WhatsAppChannel(opts);
 
@@ -502,11 +517,87 @@ describe('WhatsAppChannel', () => {
         },
       ]);
 
-      // Still delivered but with empty content
+      // Still delivered but with empty content when no API key
       expect(opts.onMessage).toHaveBeenCalledWith(
         'registered@g.us',
         expect.objectContaining({ content: '' }),
       );
+
+      if (savedKey !== undefined) process.env.GROQ_API_KEY = savedKey;
+    });
+
+    it('transcribes voice message when GROQ_API_KEY is set', async () => {
+      process.env.GROQ_API_KEY = 'test-groq-key';
+
+      vi.mocked(downloadMediaMessage).mockResolvedValue(Buffer.from('fake-audio') as any);
+      vi.mocked(transcribeAudio).mockResolvedValue('Hello from voice');
+
+      const opts = createTestOpts();
+      const channel = new WhatsAppChannel(opts);
+
+      await connectChannel(channel);
+
+      triggerMessages([
+        {
+          key: {
+            id: 'msg-voice-ok',
+            remoteJid: 'registered@g.us',
+            participant: '5551234@s.whatsapp.net',
+            fromMe: false,
+          },
+          message: {
+            audioMessage: { mimetype: 'audio/ogg; codecs=opus', ptt: true },
+          },
+          pushName: 'Frank',
+          messageTimestamp: Math.floor(Date.now() / 1000),
+        },
+      ]);
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(opts.onMessage).toHaveBeenCalledWith(
+        'registered@g.us',
+        expect.objectContaining({ content: '[Voice] Hello from voice' }),
+      );
+
+      delete process.env.GROQ_API_KEY;
+    });
+
+    it('falls back gracefully when voice transcription fails', async () => {
+      process.env.GROQ_API_KEY = 'test-groq-key';
+
+      vi.mocked(downloadMediaMessage).mockResolvedValue(Buffer.from('fake-audio') as any);
+      vi.mocked(transcribeAudio).mockRejectedValue(new Error('Groq API error 500'));
+
+      const opts = createTestOpts();
+      const channel = new WhatsAppChannel(opts);
+
+      await connectChannel(channel);
+
+      triggerMessages([
+        {
+          key: {
+            id: 'msg-voice-fail',
+            remoteJid: 'registered@g.us',
+            participant: '5551234@s.whatsapp.net',
+            fromMe: false,
+          },
+          message: {
+            audioMessage: { mimetype: 'audio/ogg; codecs=opus', ptt: true },
+          },
+          pushName: 'Frank',
+          messageTimestamp: Math.floor(Date.now() / 1000),
+        },
+      ]);
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(opts.onMessage).toHaveBeenCalledWith(
+        'registered@g.us',
+        expect.objectContaining({ content: '[Voice message - transcription failed]' }),
+      );
+
+      delete process.env.GROQ_API_KEY;
     });
 
     it('uses sender JID when pushName is absent', async () => {
