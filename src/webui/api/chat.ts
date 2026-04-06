@@ -5,7 +5,10 @@ import { getMessagesForGroup, storeChatMessage } from '../../db.js';
 
 const WEB_CHAT_JID = 'web@chat';
 
-export function registerChatRoutes(app: FastifyInstance, deps: ServerDeps): void {
+export function registerChatRoutes(
+  app: FastifyInstance,
+  deps: ServerDeps,
+): void {
   app.get('/api/chat/history', async (req) => {
     const query = req.query as { limit?: string; before?: string };
     const limit = Math.min(parseInt(query.limit || '50', 10) || 50, 200);
@@ -43,10 +46,12 @@ export function handleChatWebSocket(ws: WebSocket, _deps: ServerDeps): void {
           is_from_me: false,
         });
       } catch (err) {
-        ws.send(JSON.stringify({
-          type: 'chat.error',
-          error: `Failed to store message: ${err instanceof Error ? err.message : 'Unknown'}`,
-        }));
+        ws.send(
+          JSON.stringify({
+            type: 'chat.error',
+            error: `Failed to store message: ${err instanceof Error ? err.message : 'Unknown'}`,
+          }),
+        );
         return;
       }
 

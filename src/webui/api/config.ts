@@ -75,7 +75,8 @@ export function registerConfigRoutes(app: FastifyInstance): void {
     '/api/config/groups/:folder/claude-md',
     async (req, reply) => {
       const { content } = req.body || {};
-      if (content === undefined) return reply.status(400).send({ error: 'content required' });
+      if (content === undefined)
+        return reply.status(400).send({ error: 'content required' });
 
       const groupDir = path.join(GROUPS_DIR, req.params.folder);
       if (!fs.existsSync(groupDir)) {
@@ -101,7 +102,8 @@ export function registerConfigRoutes(app: FastifyInstance): void {
     '/api/config/global/claude-md',
     async (req, reply) => {
       const { content } = req.body || {};
-      if (content === undefined) return reply.status(400).send({ error: 'content required' });
+      if (content === undefined)
+        return reply.status(400).send({ error: 'content required' });
 
       const globalDir = path.join(GROUPS_DIR, 'global');
       fs.mkdirSync(globalDir, { recursive: true });

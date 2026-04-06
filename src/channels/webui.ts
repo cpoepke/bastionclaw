@@ -30,7 +30,9 @@ export class WebUIChannel implements Channel {
         timestamp: new Date().toISOString(),
         is_from_me: true,
       });
-    } catch { /* best-effort */ }
+    } catch {
+      /* best-effort */
+    }
 
     // Broadcast to all connected WebSocket clients
     broadcast({ type: 'chat.done', text });

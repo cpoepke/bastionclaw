@@ -3,7 +3,13 @@ import fs from 'fs';
 import path from 'path';
 
 const WORKSPACE = path.resolve(process.cwd(), 'workspace', 'group', 'youtube');
-const SOURCES_FILE = path.resolve(process.cwd(), '.claude', 'skills', 'youtube-planner', 'sources.json');
+const SOURCES_FILE = path.resolve(
+  process.cwd(),
+  '.claude',
+  'skills',
+  'youtube-planner',
+  'sources.json',
+);
 
 // Find all metadata JSON files under workspace date/channel/video/metadata dirs
 function findMetadataFiles(base: string): string[] {
@@ -51,7 +57,9 @@ function parseTimestamp(filename: string): Date | null {
   const stem = path.basename(filename, '.json');
   const match = stem.match(/^(\d{4})-(\d{2})-(\d{2})-(\d{2})(\d{2})$/);
   if (!match) return null;
-  return new Date(`${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:00Z`);
+  return new Date(
+    `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:00Z`,
+  );
 }
 
 function calculateVph(views: number, publishedStr: string): number {
@@ -79,13 +87,18 @@ function collectVideos(): {
   if (!fs.existsSync(WORKSPACE)) return [];
 
   const metadataFiles = findMetadataFiles(WORKSPACE);
-  const videoMap = new Map<string, { meta: VideoMeta; snapshots: [Date, number][] }>();
+  const videoMap = new Map<
+    string,
+    { meta: VideoMeta; snapshots: [Date, number][] }
+  >();
 
   for (const filepath of metadataFiles) {
     let meta: VideoMeta;
     try {
       meta = JSON.parse(fs.readFileSync(filepath, 'utf-8'));
-    } catch { continue; }
+    } catch {
+      continue;
+    }
 
     const videoId = meta.video_id || meta.videoId || '';
     if (!videoId) continue;
@@ -108,13 +121,16 @@ function collectVideos(): {
     snapshots.sort((a, b) => a[0].getTime() - b[0].getTime());
     const latestViews = snapshots[snapshots.length - 1][1];
     const vph = calculateVph(latestViews, meta.published);
-    const sparklinePoints = snapshots.map(s => s[1]);
+    const sparklinePoints = snapshots.map((s) => s[1]);
 
     let trendDirection: 'accelerating' | 'decelerating' | 'flat' = 'flat';
     if (sparklinePoints.length >= 2) {
       const mid = Math.floor(sparklinePoints.length / 2);
-      const firstAvg = sparklinePoints.slice(0, mid).reduce((a, b) => a + b, 0) / mid;
-      const secondAvg = sparklinePoints.slice(mid).reduce((a, b) => a + b, 0) / (sparklinePoints.length - mid);
+      const firstAvg =
+        sparklinePoints.slice(0, mid).reduce((a, b) => a + b, 0) / mid;
+      const secondAvg =
+        sparklinePoints.slice(mid).reduce((a, b) => a + b, 0) /
+        (sparklinePoints.length - mid);
       if (secondAvg > firstAvg * 1.1) trendDirection = 'accelerating';
       else if (secondAvg < firstAvg * 0.9) trendDirection = 'decelerating';
     }
@@ -154,7 +170,10 @@ function readSources(): { sources: string[]; lookbackDays: number } {
 function writeSources(sources: string[], lookbackDays: number): void {
   const dir = path.dirname(SOURCES_FILE);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(SOURCES_FILE, JSON.stringify({ sources, lookback_days: lookbackDays }, null, 2) + '\n');
+  fs.writeFileSync(
+    SOURCES_FILE,
+    JSON.stringify({ sources, lookback_days: lookbackDays }, null, 2) + '\n',
+  );
 }
 
 export function registerYouTubeRoutes(app: FastifyInstance): void {
@@ -173,27 +192,35 @@ export function registerYouTubeRoutes(app: FastifyInstance): void {
   });
 
   // Add a channel to sources
-  app.post<{ Body: { handle: string } }>('/api/youtube/sources', async (req, reply) => {
-    const handle = req.body.handle?.trim();
-    if (!handle) return reply.status(400).send({ error: 'handle is required' });
-    const normalized = handle.startsWith('@') ? handle : `@${handle}`;
-    const { sources, lookbackDays } = readSources();
-    if (sources.includes(normalized)) {
-      return { ok: true, message: 'Already tracked' };
-    }
-    sources.push(normalized);
-    writeSources(sources, lookbackDays);
-    return { ok: true, sources };
-  });
+  app.post<{ Body: { handle: string } }>(
+    '/api/youtube/sources',
+    async (req, reply) => {
+      const handle = req.body.handle?.trim();
+      if (!handle)
+        return reply.status(400).send({ error: 'handle is required' });
+      const normalized = handle.startsWith('@') ? handle : `@${handle}`;
+      const { sources, lookbackDays } = readSources();
+      if (sources.includes(normalized)) {
+        return { ok: true, message: 'Already tracked' };
+      }
+      sources.push(normalized);
+      writeSources(sources, lookbackDays);
+      return { ok: true, sources };
+    },
+  );
 
   // Remove a channel from sources
-  app.delete<{ Params: { handle: string } }>('/api/youtube/sources/:handle', async (req, reply) => {
-    const handle = decodeURIComponent(req.params.handle);
-    const { sources, lookbackDays } = readSources();
-    const idx = sources.indexOf(handle);
-    if (idx === -1) return reply.status(404).send({ error: 'Channel not found' });
-    sources.splice(idx, 1);
-    writeSources(sources, lookbackDays);
-    return { ok: true, sources };
-  });
+  app.delete<{ Params: { handle: string } }>(
+    '/api/youtube/sources/:handle',
+    async (req, reply) => {
+      const handle = decodeURIComponent(req.params.handle);
+      const { sources, lookbackDays } = readSources();
+      const idx = sources.indexOf(handle);
+      if (idx === -1)
+        return reply.status(404).send({ error: 'Channel not found' });
+      sources.splice(idx, 1);
+      writeSources(sources, lookbackDays);
+      return { ok: true, sources };
+    },
+  );
 }

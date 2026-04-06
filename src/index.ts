@@ -110,15 +110,15 @@ function loadState(): void {
 
 function saveState(): void {
   setRouterState('last_timestamp', lastTimestamp);
-  setRouterState(
-    'last_agent_timestamp',
-    JSON.stringify(lastAgentTimestamp),
-  );
+  setRouterState('last_agent_timestamp', JSON.stringify(lastAgentTimestamp));
 }
 
 function registerGroup(jid: string, group: RegisteredGroup): void {
   if (!isValidGroupFolder(group.folder)) {
-    logger.error({ folder: group.folder }, 'Rejected group with invalid folder name');
+    logger.error(
+      { folder: group.folder },
+      'Rejected group with invalid folder name',
+    );
     return;
   }
   registeredGroups[jid] = group;
@@ -143,7 +143,13 @@ export function getAvailableGroups(): import('./container-runner.js').AvailableG
   const registeredJids = new Set(Object.keys(registeredGroups));
 
   return chats
-    .filter((c) => c.jid !== '__group_sync__' && (c.jid.endsWith('@g.us') || c.jid.startsWith('tg:') || c.jid.startsWith('dc:')))
+    .filter(
+      (c) =>
+        c.jid !== '__group_sync__' &&
+        (c.jid.endsWith('@g.us') ||
+          c.jid.startsWith('tg:') ||
+          c.jid.startsWith('dc:')),
+    )
     .map((c) => ({
       jid: c.jid,
       name: c.name,
@@ -153,7 +159,9 @@ export function getAvailableGroups(): import('./container-runner.js').AvailableG
 }
 
 /** @internal - exported for testing */
-export function _setRegisteredGroups(groups: Record<string, RegisteredGroup>): void {
+export function _setRegisteredGroups(
+  groups: Record<string, RegisteredGroup>,
+): void {
   registeredGroups = groups;
 }
 
@@ -177,12 +185,13 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   if (missedMessages.length === 0) return true;
 
   // Filter by sender allowlist — only applies to WhatsApp (numeric sender IDs)
-  const filteredMessages = WHATSAPP_ALLOWED_SENDERS.size > 0
-    ? missedMessages.filter((m) => {
-        const id = m.sender.split('@')[0];
-        return !/^\d+$/.test(id) || WHATSAPP_ALLOWED_SENDERS.has(id);
-      })
-    : missedMessages;
+  const filteredMessages =
+    WHATSAPP_ALLOWED_SENDERS.size > 0
+      ? missedMessages.filter((m) => {
+          const id = m.sender.split('@')[0];
+          return !/^\d+$/.test(id) || WHATSAPP_ALLOWED_SENDERS.has(id);
+        })
+      : missedMessages;
 
   if (filteredMessages.length === 0) return true;
 
@@ -190,7 +199,15 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   for (const msg of filteredMessages) {
     const result = sanitizePrompt(msg.content);
     if (!result.safe) {
-      logger.warn({ chatJid, sender: msg.sender_name, reason: result.reason, blocked: result.blocked }, 'Prompt injection detected');
+      logger.warn(
+        {
+          chatJid,
+          sender: msg.sender_name,
+          reason: result.reason,
+          blocked: result.blocked,
+        },
+        'Prompt injection detected',
+      );
       if (result.blocked) {
         const channel = findChannel(channels, chatJid);
         if (channel) {
@@ -203,7 +220,9 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   }
 
   // Drop fully blocked messages (content replaced with rejection notice)
-  const passedMessages = filteredMessages.filter((m) => !m.content.startsWith('[Message blocked:'));
+  const passedMessages = filteredMessages.filter(
+    (m) => !m.content.startsWith('[Message blocked:'),
+  );
   if (passedMessages.length === 0) return true;
 
   // For non-main groups, check if trigger is required and present
@@ -238,7 +257,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   const resetIdleTimer = () => {
     if (idleTimer) clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
-      logger.debug({ group: group.name }, 'Idle timeout, closing container stdin');
+      logger.debug(
+        { group: group.name },
+        'Idle timeout, closing container stdin',
+      );
       queue.closeStdin(chatJid);
     }, IDLE_TIMEOUT);
   };
@@ -255,17 +277,26 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   const output = await runAgent(group, prompt, chatJid, async (result) => {
     // Streaming output callback — called for each agent result
     if (result.result) {
-      const raw = typeof result.result === 'string' ? result.result : JSON.stringify(result.result);
+      const raw =
+        typeof result.result === 'string'
+          ? result.result
+          : JSON.stringify(result.result);
       // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
       const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
-      logger.info({ group: group.name, hasChannel: !!channel, textLen: text.length }, `Agent output: ${raw.slice(0, 200)}`);
+      logger.info(
+        { group: group.name, hasChannel: !!channel, textLen: text.length },
+        `Agent output: ${raw.slice(0, 200)}`,
+      );
       if (text && channel) {
         const formatted = formatOutbound(channel, text);
         if (formatted) {
           try {
             await channel.sendMessage(chatJid, formatted);
           } catch (err) {
-            logger.error({ group: group.name, chatJid, err }, 'Failed to send agent output');
+            logger.error(
+              { group: group.name, chatJid, err },
+              'Failed to send agent output',
+            );
           }
         } else {
           logger.warn({ group: group.name }, 'formatOutbound returned empty');
@@ -301,7 +332,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     // the user got their response and re-processing would send duplicates.
     if (outputSentToUser) {
       consecutiveErrors[chatJid] = 0;
-      logger.warn({ group: group.name }, 'Agent error after output was sent, skipping cursor rollback to prevent duplicates');
+      logger.warn(
+        { group: group.name },
+        'Agent error after output was sent, skipping cursor rollback to prevent duplicates',
+      );
       return true;
     }
 
@@ -317,9 +351,15 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       );
       if (channel) {
         try {
-          await channel.sendMessage(chatJid, '⚠️ Failed to process after multiple retries. Skipping — send your message again to retry.');
+          await channel.sendMessage(
+            chatJid,
+            '⚠️ Failed to process after multiple retries. Skipping — send your message again to retry.',
+          );
         } catch (notifyErr) {
-          logger.warn({ group: group.name, err: notifyErr }, 'Failed to send skip notification');
+          logger.warn(
+            { group: group.name, err: notifyErr },
+            'Failed to send skip notification',
+          );
         }
       }
       consecutiveErrors[chatJid] = 0;
@@ -330,16 +370,25 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     // Notify the user only on first failure
     if (errorCount === 1 && channel) {
       try {
-        await channel.sendMessage(chatJid, '⚠️ Something went wrong processing that request. The agent will retry automatically.');
+        await channel.sendMessage(
+          chatJid,
+          '⚠️ Something went wrong processing that request. The agent will retry automatically.',
+        );
       } catch (notifyErr) {
-        logger.warn({ group: group.name, err: notifyErr }, 'Failed to send error notification to channel');
+        logger.warn(
+          { group: group.name, err: notifyErr },
+          'Failed to send error notification to channel',
+        );
       }
     }
 
     // Roll back cursor so retries can re-process these messages
     lastAgentTimestamp[chatJid] = previousCursor;
     saveState();
-    logger.warn({ group: group.name, errorCount }, 'Agent error, rolled back message cursor for retry');
+    logger.warn(
+      { group: group.name, errorCount },
+      'Agent error, rolled back message cursor for retry',
+    );
     return false;
   }
 
@@ -403,7 +452,8 @@ async function runAgent(
         isMain,
         assistantName: ASSISTANT_NAME,
       },
-      (proc, containerName) => queue.registerProcess(chatJid, proc, containerName, group.folder),
+      (proc, containerName) =>
+        queue.registerProcess(chatJid, proc, containerName, group.folder),
       wrappedOnOutput,
     );
 
@@ -471,12 +521,13 @@ async function startMessageLoop(): Promise<void> {
           const needsTrigger = !isMainGroup && group.requiresTrigger !== false;
 
           // Filter by sender allowlist — only applies to WhatsApp (numeric sender IDs)
-          const allowed = WHATSAPP_ALLOWED_SENDERS.size > 0
-            ? groupMessages.filter((m) => {
-                const id = m.sender.split('@')[0];
-                return !/^\d+$/.test(id) || WHATSAPP_ALLOWED_SENDERS.has(id);
-              })
-            : groupMessages;
+          const allowed =
+            WHATSAPP_ALLOWED_SENDERS.size > 0
+              ? groupMessages.filter((m) => {
+                  const id = m.sender.split('@')[0];
+                  return !/^\d+$/.test(id) || WHATSAPP_ALLOWED_SENDERS.has(id);
+                })
+              : groupMessages;
           if (allowed.length === 0) continue;
 
           // For non-main groups, only act on trigger messages.
@@ -502,7 +553,11 @@ async function startMessageLoop(): Promise<void> {
 
           if (queue.sendMessage(chatJid, formatted)) {
             logger.info(
-              { chatJid, count: messagesToSend.length, prompt: messagesToSend[0]?.content },
+              {
+                chatJid,
+                count: messagesToSend.length,
+                prompt: messagesToSend[0]?.content,
+              },
               'Piped messages to active container',
             );
             lastAgentTimestamp[chatJid] =
@@ -557,19 +612,40 @@ function ensureContainerSystemRunning(): void {
     } catch {
       logger.info('Starting Apple Container system...');
       try {
-        execFileSync('container', ['system', 'start'], { stdio: 'pipe', timeout: 30000 });
+        execFileSync('container', ['system', 'start'], {
+          stdio: 'pipe',
+          timeout: 30000,
+        });
         logger.info('Apple Container system started');
       } catch (err) {
         logger.error({ err }, 'Failed to start Apple Container system');
-        console.error('\n╔════════════════════════════════════════════════════════════════╗');
-        console.error('║  FATAL: Apple Container system failed to start                 ║');
-        console.error('║                                                                ║');
-        console.error('║  Agents cannot run without Apple Container. To fix:           ║');
-        console.error('║  1. Install from: https://github.com/apple/container/releases ║');
-        console.error('║  2. Run: container system start                               ║');
-        console.error('║  3. Restart BastionClaw                                          ║');
-        console.error('╚════════════════════════════════════════════════════════════════╝\n');
-        throw new Error('Apple Container system is required but failed to start');
+        console.error(
+          '\n╔════════════════════════════════════════════════════════════════╗',
+        );
+        console.error(
+          '║  FATAL: Apple Container system failed to start                 ║',
+        );
+        console.error(
+          '║                                                                ║',
+        );
+        console.error(
+          '║  Agents cannot run without Apple Container. To fix:           ║',
+        );
+        console.error(
+          '║  1. Install from: https://github.com/apple/container/releases ║',
+        );
+        console.error(
+          '║  2. Run: container system start                               ║',
+        );
+        console.error(
+          '║  3. Restart BastionClaw                                          ║',
+        );
+        console.error(
+          '╚════════════════════════════════════════════════════════════════╝\n',
+        );
+        throw new Error(
+          'Apple Container system is required but failed to start',
+        );
       }
     }
   } else {
@@ -579,14 +655,30 @@ function ensureContainerSystemRunning(): void {
       logger.debug('Docker daemon is running');
     } catch {
       logger.error('Docker daemon is not running');
-      console.error('\n╔════════════════════════════════════════════════════════════════╗');
-      console.error('║  FATAL: Docker is not running                                  ║');
-      console.error('║                                                                ║');
-      console.error('║  Agents cannot run without Docker. To fix:                     ║');
-      console.error('║  macOS:  Start Docker Desktop                                  ║');
-      console.error('║  Linux:  sudo systemctl start docker                           ║');
-      console.error('║  Install: https://docker.com/products/docker-desktop           ║');
-      console.error('╚════════════════════════════════════════════════════════════════╝\n');
+      console.error(
+        '\n╔════════════════════════════════════════════════════════════════╗',
+      );
+      console.error(
+        '║  FATAL: Docker is not running                                  ║',
+      );
+      console.error(
+        '║                                                                ║',
+      );
+      console.error(
+        '║  Agents cannot run without Docker. To fix:                     ║',
+      );
+      console.error(
+        '║  macOS:  Start Docker Desktop                                  ║',
+      );
+      console.error(
+        '║  Linux:  sudo systemctl start docker                           ║',
+      );
+      console.error(
+        '║  Install: https://docker.com/products/docker-desktop           ║',
+      );
+      console.error(
+        '╚════════════════════════════════════════════════════════════════╝\n',
+      );
       throw new Error('Docker is required but not running');
     }
   }
@@ -598,44 +690,81 @@ function ensureContainerSystemRunning(): void {
         stdio: ['pipe', 'pipe', 'pipe'],
         encoding: 'utf-8',
       });
-      const containers: { status: string; configuration: { id: string } }[] = JSON.parse(output || '[]');
+      const containers: { status: string; configuration: { id: string } }[] =
+        JSON.parse(output || '[]');
       const orphans = containers
-        .filter((c) => c.status === 'running' && c.configuration.id.startsWith('bastionclaw-'))
+        .filter(
+          (c) =>
+            c.status === 'running' &&
+            c.configuration.id.startsWith('bastionclaw-'),
+        )
         .map((c) => c.configuration.id);
       for (const name of orphans) {
         try {
-          execFileSync('container', ['stop', name], { stdio: 'pipe', timeout: 10000 });
+          execFileSync('container', ['stop', name], {
+            stdio: 'pipe',
+            timeout: 10000,
+          });
         } catch {
           // If stop hangs, force kill via launchctl process lookup (no shell interpolation)
           try {
-            const launchList = execFileSync('launchctl', ['list'], { encoding: 'utf-8', stdio: 'pipe', timeout: 5000 });
-            const pidLine = launchList.split('\n').find(l => l.includes(name));
+            const launchList = execFileSync('launchctl', ['list'], {
+              encoding: 'utf-8',
+              stdio: 'pipe',
+              timeout: 5000,
+            });
+            const pidLine = launchList
+              .split('\n')
+              .find((l) => l.includes(name));
             if (pidLine) {
               const pid = pidLine.trim().split(/\s+/)[0];
               if (/^\d+$/.test(pid)) {
-                execFileSync('kill', ['-9', pid], { stdio: 'pipe', timeout: 5000 });
+                execFileSync('kill', ['-9', pid], {
+                  stdio: 'pipe',
+                  timeout: 5000,
+                });
               }
             }
-          } catch { /* best effort */ }
+          } catch {
+            /* best effort */
+          }
         }
       }
       if (orphans.length > 0) {
-        logger.info({ count: orphans.length, names: orphans }, 'Stopped orphaned containers');
+        logger.info(
+          { count: orphans.length, names: orphans },
+          'Stopped orphaned containers',
+        );
       }
     } else {
-      const output = execFileSync('docker', ['ps', '--format', '{{.Names}}', '--filter', 'name=bastionclaw-'], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        encoding: 'utf-8',
-      });
+      const output = execFileSync(
+        'docker',
+        ['ps', '--format', '{{.Names}}', '--filter', 'name=bastionclaw-'],
+        {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          encoding: 'utf-8',
+        },
+      );
       const orphans = output.trim().split('\n').filter(Boolean);
       for (const name of orphans) {
         try {
-          execFileSync('docker', ['stop', '-t', '5', name], { stdio: 'pipe', timeout: 10000 });
-          execFileSync('docker', ['rm', '-f', name], { stdio: 'pipe', timeout: 5000 });
-        } catch { /* already stopped */ }
+          execFileSync('docker', ['stop', '-t', '5', name], {
+            stdio: 'pipe',
+            timeout: 10000,
+          });
+          execFileSync('docker', ['rm', '-f', name], {
+            stdio: 'pipe',
+            timeout: 5000,
+          });
+        } catch {
+          /* already stopped */
+        }
       }
       if (orphans.length > 0) {
-        logger.info({ count: orphans.length, names: orphans }, 'Stopped orphaned containers');
+        logger.info(
+          { count: orphans.length, names: orphans },
+          'Stopped orphaned containers',
+        );
       }
     }
   } catch (err) {
@@ -707,8 +836,9 @@ async function main(): Promise<void> {
   channels.push(webuiChannel);
 
   // Register web@chat so the message loop picks up WebUI messages
-  const mainEntry = Object.entries(registeredGroups)
-    .find(([, g]) => g.folder === MAIN_GROUP_FOLDER);
+  const mainEntry = Object.entries(registeredGroups).find(
+    ([, g]) => g.folder === MAIN_GROUP_FOLDER,
+  );
   if (mainEntry) {
     const [, mainGroup] = mainEntry;
     registeredGroups['web@chat'] = {
@@ -726,7 +856,8 @@ async function main(): Promise<void> {
     registeredGroups: () => registeredGroups,
     getSessions: () => sessions,
     queue,
-    onProcess: (groupJid, proc, containerName, groupFolder) => queue.registerProcess(groupJid, proc, containerName, groupFolder),
+    onProcess: (groupJid, proc, containerName, groupFolder) =>
+      queue.registerProcess(groupJid, proc, containerName, groupFolder),
     sendMessage: async (jid, rawText) => {
       const channel = findChannel(channels, jid);
       if (!channel) return;
@@ -758,20 +889,27 @@ async function main(): Promise<void> {
     sendWebhookImage: DISCORD_BOT_TOKEN
       ? async (jid, imagePath, caption, sender) => {
           const ch = findChannel(channels, jid);
-          if (ch instanceof DiscordChannel) await ch.sendImageAsWebhook(jid, imagePath, caption, sender);
-          else if (ch?.sendImage) await ch.sendImage(jid, imagePath, `${sender}: ${caption}`);
-          else if (ch) await ch.sendMessage(jid, `${sender}: ${caption || '[Image]'}`);
+          if (ch instanceof DiscordChannel)
+            await ch.sendImageAsWebhook(jid, imagePath, caption, sender);
+          else if (ch?.sendImage)
+            await ch.sendImage(jid, imagePath, `${sender}: ${caption}`);
+          else if (ch)
+            await ch.sendMessage(jid, `${sender}: ${caption || '[Image]'}`);
         }
       : undefined,
     registeredGroups: () => registeredGroups,
     registerGroup,
     registerWebhook: (jid, url) => {
-      const ch = channels.find(c => c instanceof DiscordChannel) as DiscordChannel | undefined;
+      const ch = channels.find((c) => c instanceof DiscordChannel) as
+        | DiscordChannel
+        | undefined;
       ch?.registerWebhook(jid, url);
     },
-    syncGroupMetadata: (force) => whatsapp?.syncGroupMetadata(force) ?? Promise.resolve(),
+    syncGroupMetadata: (force) =>
+      whatsapp?.syncGroupMetadata(force) ?? Promise.resolve(),
     getAvailableGroups,
-    writeGroupsSnapshot: (gf, im, ag, rj) => writeGroupsSnapshot(gf, im, ag, rj),
+    writeGroupsSnapshot: (gf, im, ag, rj) =>
+      writeGroupsSnapshot(gf, im, ag, rj),
   });
   queue.setProcessMessagesFn(processGroupMessages);
   recoverPendingMessages();
@@ -785,7 +923,8 @@ async function main(): Promise<void> {
 // Guard: only run when executed directly, not when imported by tests
 const isDirectRun =
   process.argv[1] &&
-  new URL(import.meta.url).pathname === new URL(`file://${process.argv[1]}`).pathname;
+  new URL(import.meta.url).pathname ===
+    new URL(`file://${process.argv[1]}`).pathname;
 
 if (isDirectRun) {
   main().catch((err) => {

@@ -1,5 +1,11 @@
 import type { FastifyInstance } from 'fastify';
-import { getAllTasks, getTaskById, getTaskRunLogs, updateTask, deleteTask } from '../../db.js';
+import {
+  getAllTasks,
+  getTaskById,
+  getTaskRunLogs,
+  updateTask,
+  deleteTask,
+} from '../../db.js';
 
 export function registerTaskRoutes(app: FastifyInstance): void {
   app.get('/api/tasks', async () => {
@@ -19,24 +25,33 @@ export function registerTaskRoutes(app: FastifyInstance): void {
     };
   });
 
-  app.post<{ Params: { id: string } }>('/api/tasks/:id/pause', async (req, reply) => {
-    const task = getTaskById(req.params.id);
-    if (!task) return reply.status(404).send({ error: 'Task not found' });
-    updateTask(req.params.id, { status: 'paused' });
-    return { ok: true };
-  });
+  app.post<{ Params: { id: string } }>(
+    '/api/tasks/:id/pause',
+    async (req, reply) => {
+      const task = getTaskById(req.params.id);
+      if (!task) return reply.status(404).send({ error: 'Task not found' });
+      updateTask(req.params.id, { status: 'paused' });
+      return { ok: true };
+    },
+  );
 
-  app.post<{ Params: { id: string } }>('/api/tasks/:id/resume', async (req, reply) => {
-    const task = getTaskById(req.params.id);
-    if (!task) return reply.status(404).send({ error: 'Task not found' });
-    updateTask(req.params.id, { status: 'active' });
-    return { ok: true };
-  });
+  app.post<{ Params: { id: string } }>(
+    '/api/tasks/:id/resume',
+    async (req, reply) => {
+      const task = getTaskById(req.params.id);
+      if (!task) return reply.status(404).send({ error: 'Task not found' });
+      updateTask(req.params.id, { status: 'active' });
+      return { ok: true };
+    },
+  );
 
-  app.delete<{ Params: { id: string } }>('/api/tasks/:id', async (req, reply) => {
-    const task = getTaskById(req.params.id);
-    if (!task) return reply.status(404).send({ error: 'Task not found' });
-    deleteTask(req.params.id);
-    return { ok: true };
-  });
+  app.delete<{ Params: { id: string } }>(
+    '/api/tasks/:id',
+    async (req, reply) => {
+      const task = getTaskById(req.params.id);
+      if (!task) return reply.status(404).send({ error: 'Task not found' });
+      deleteTask(req.params.id);
+      return { ok: true };
+    },
+  );
 }

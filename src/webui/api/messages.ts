@@ -7,7 +7,9 @@ export function registerMessageRoutes(app: FastifyInstance): void {
   }>('/api/messages', async (req, reply) => {
     const { group, limit: limitStr, before } = req.query;
     if (!group) {
-      return reply.status(400).send({ error: 'group query parameter required' });
+      return reply
+        .status(400)
+        .send({ error: 'group query parameter required' });
     }
 
     const limit = Math.min(parseInt(limitStr || '50', 10) || 50, 200);

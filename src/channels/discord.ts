@@ -1,4 +1,11 @@
-import { Client, Events, GatewayIntentBits, Message, TextChannel, WebhookClient } from 'discord.js';
+import {
+  Client,
+  Events,
+  GatewayIntentBits,
+  Message,
+  TextChannel,
+  WebhookClient,
+} from 'discord.js';
 
 import { ASSISTANT_NAME, TRIGGER_PATTERN } from '../config.js';
 import { logger } from '../logger.js';
@@ -81,7 +88,10 @@ export class DiscordChannel implements Channel {
     if (fallbackUrls.length > 0) {
       this.defaultWebhook = new WebhookClient({ url: fallbackUrls[0] });
     }
-    logger.info({ mapped: this.webhookMap.size, fallback: !!this.defaultWebhook }, 'Discord webhooks initialized');
+    logger.info(
+      { mapped: this.webhookMap.size, fallback: !!this.defaultWebhook },
+      'Discord webhooks initialized',
+    );
   }
 
   registerWebhook(jid: string, url: string): void {
@@ -89,7 +99,11 @@ export class DiscordChannel implements Channel {
     logger.info({ jid }, 'Discord webhook registered');
   }
 
-  async sendAsWebhook(jid: string, text: string, sender: string): Promise<void> {
+  async sendAsWebhook(
+    jid: string,
+    text: string,
+    sender: string,
+  ): Promise<void> {
     const wh = this.webhookMap.get(jid) || this.defaultWebhook;
     if (!wh) {
       await this.sendMessage(jid, `${sender}: ${text}`);
@@ -105,7 +119,10 @@ export class DiscordChannel implements Channel {
         avatarURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(sender)}&background=random&size=128`,
       });
     }
-    logger.info({ jid, sender, length: text.length }, 'Discord webhook message sent');
+    logger.info(
+      { jid, sender, length: text.length },
+      'Discord webhook message sent',
+    );
   }
 
   async connect(): Promise<void> {
@@ -160,18 +177,20 @@ export class DiscordChannel implements Channel {
 
       // Describe attachments as text placeholders
       if (message.attachments.size > 0) {
-        const attachmentDescriptions = [...message.attachments.values()].map((att) => {
-          const contentType = att.contentType || '';
-          if (contentType.startsWith('image/')) {
-            return `[Image: ${att.name || 'image'}]`;
-          } else if (contentType.startsWith('video/')) {
-            return `[Video: ${att.name || 'video'}]`;
-          } else if (contentType.startsWith('audio/')) {
-            return `[Audio: ${att.name || 'audio'}]`;
-          } else {
-            return `[File: ${att.name || 'file'}]`;
-          }
-        });
+        const attachmentDescriptions = [...message.attachments.values()].map(
+          (att) => {
+            const contentType = att.contentType || '';
+            if (contentType.startsWith('image/')) {
+              return `[Image: ${att.name || 'image'}]`;
+            } else if (contentType.startsWith('video/')) {
+              return `[Video: ${att.name || 'video'}]`;
+            } else if (contentType.startsWith('audio/')) {
+              return `[Audio: ${att.name || 'audio'}]`;
+            } else {
+              return `[File: ${att.name || 'file'}]`;
+            }
+          },
+        );
         if (content) {
           content = `${content}\n${attachmentDescriptions.join('\n')}`;
         } else {
@@ -286,7 +305,11 @@ export class DiscordChannel implements Channel {
     }
   }
 
-  async sendImage(jid: string, imagePath: string, caption?: string): Promise<void> {
+  async sendImage(
+    jid: string,
+    imagePath: string,
+    caption?: string,
+  ): Promise<void> {
     if (!this.client) {
       logger.warn('Discord client not initialized');
       return;
@@ -301,14 +324,22 @@ export class DiscordChannel implements Channel {
         return;
       }
 
-      await (channel as TextChannel).send({ content: caption || '', files: [imagePath] });
+      await (channel as TextChannel).send({
+        content: caption || '',
+        files: [imagePath],
+      });
       logger.info({ jid, imagePath }, 'Discord image sent');
     } catch (err) {
       logger.error({ jid, imagePath, err }, 'Failed to send Discord image');
     }
   }
 
-  async sendImageAsWebhook(jid: string, imagePath: string, caption: string, sender: string): Promise<void> {
+  async sendImageAsWebhook(
+    jid: string,
+    imagePath: string,
+    caption: string,
+    sender: string,
+  ): Promise<void> {
     const wh = this.webhookMap.get(jid) || this.defaultWebhook;
     if (!wh) {
       await this.sendImage(jid, imagePath, `${sender}: ${caption}`);

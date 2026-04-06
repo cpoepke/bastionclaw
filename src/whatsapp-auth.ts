@@ -45,15 +45,21 @@ function generateQrSvg(qrText: string): Promise<string> {
   fs.writeFileSync(tmpFile, script);
 
   return new Promise((resolve, reject) => {
-    exec(`node "${tmpFile}"`, { cwd: process.cwd() }, (error, stdout, stderr) => {
-      try { fs.unlinkSync(tmpFile); } catch {}
+    exec(
+      `node "${tmpFile}"`,
+      { cwd: process.cwd() },
+      (error, stdout, stderr) => {
+        try {
+          fs.unlinkSync(tmpFile);
+        } catch {}
 
-      if (error) {
-        reject(new Error(stderr || error.message));
-      } else {
-        resolve(stdout);
-      }
-    });
+        if (error) {
+          reject(new Error(stderr || error.message));
+        } else {
+          resolve(stdout);
+        }
+      },
+    );
   });
 }
 
@@ -147,8 +153,12 @@ function buildSuccessPage(): string {
 
 function openInBrowser(filePath: string): void {
   const absPath = path.resolve(filePath);
-  const cmd = process.platform === 'darwin' ? 'open' :
-    process.platform === 'win32' ? 'start' : 'xdg-open';
+  const cmd =
+    process.platform === 'darwin'
+      ? 'open'
+      : process.platform === 'win32'
+        ? 'start'
+        : 'xdg-open';
   exec(`${cmd} "${absPath}"`);
 }
 
@@ -177,7 +187,10 @@ function showSuccessInBrowser(): void {
 // --- Terminal pairing code helpers ---
 
 function askQuestion(prompt: string): Promise<string> {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
   return new Promise((resolve) => {
     rl.question(prompt, (answer) => {
       rl.close();
@@ -195,7 +208,9 @@ async function authenticate(): Promise<void> {
 
   if (state.creds.registered) {
     console.log('Already authenticated with WhatsApp');
-    console.log('  To re-authenticate, delete the store/auth folder and run again.');
+    console.log(
+      '  To re-authenticate, delete the store/auth folder and run again.',
+    );
     process.exit(0);
   }
 
@@ -204,10 +219,14 @@ async function authenticate(): Promise<void> {
   if (useTerminal) {
     phoneNumber = phoneArg;
     if (!phoneNumber) {
-      phoneNumber = await askQuestion('Enter your phone number (with country code, no + or spaces, e.g. 14155551234): ');
+      phoneNumber = await askQuestion(
+        'Enter your phone number (with country code, no + or spaces, e.g. 14155551234): ',
+      );
     }
     if (!phoneNumber || !/^\d{10,15}$/.test(phoneNumber)) {
-      console.error('Invalid phone number. Use digits only with country code (e.g. 14155551234)');
+      console.error(
+        'Invalid phone number. Use digits only with country code (e.g. 14155551234)',
+      );
       process.exit(1);
     }
     console.log(`Starting WhatsApp authentication (pairing code)...\n`);

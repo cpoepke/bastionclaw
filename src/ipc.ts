@@ -18,9 +18,17 @@ import {
 import { isValidGroupFolder } from './group-folder.js';
 import { AvailableGroup } from './container-runner.js';
 import {
-  createTask, deleteTask, getTaskById, updateTask,
-  hashSourceUrl, getSourceByHash, createSource, createInsight,
-  linkInsightSource, getTopInsights, searchInsightsKeyword,
+  createTask,
+  deleteTask,
+  getTaskById,
+  updateTask,
+  hashSourceUrl,
+  getSourceByHash,
+  createSource,
+  createInsight,
+  linkInsightSource,
+  getTopInsights,
+  searchInsightsKeyword,
   type InsightSource,
 } from './db.js';
 import { logger } from './logger.js';
@@ -28,9 +36,22 @@ import { RegisteredGroup } from './types.js';
 
 export interface IpcDeps {
   sendMessage: (jid: string, text: string) => Promise<void>;
-  sendWebhookMessage?: (jid: string, text: string, sender: string) => Promise<void>;
-  sendImage?: (jid: string, imagePath: string, caption?: string) => Promise<void>;
-  sendWebhookImage?: (jid: string, imagePath: string, caption: string, sender: string) => Promise<void>;
+  sendWebhookMessage?: (
+    jid: string,
+    text: string,
+    sender: string,
+  ) => Promise<void>;
+  sendImage?: (
+    jid: string,
+    imagePath: string,
+    caption?: string,
+  ) => Promise<void>;
+  sendWebhookImage?: (
+    jid: string,
+    imagePath: string,
+    caption: string,
+    sender: string,
+  ) => Promise<void>;
   registeredGroups: () => Record<string, RegisteredGroup>;
   registerGroup: (jid: string, group: RegisteredGroup) => void;
   registerWebhook?: (jid: string, url: string) => void;
@@ -48,7 +69,10 @@ export interface IpcDeps {
  *  /workspace/group/foo.png → groups/{folder}/foo.png
  *  foo.png (bare filename)  → groups/{folder}/foo.png
  */
-function resolveContainerPath(containerPath: string, groupFolder: string): string {
+function resolveContainerPath(
+  containerPath: string,
+  groupFolder: string,
+): string {
   const stripped = containerPath.replace(/^\/workspace\/group\//, '');
   if (stripped !== containerPath) {
     return path.join(GROUPS_DIR, groupFolder, stripped);
@@ -111,42 +135,86 @@ export function startIpcWatcher(deps: IpcDeps): void {
                   (targetGroup && targetGroup.folder === sourceGroup)
                 ) {
                   // Strip <internal>...</internal> blocks — agent reasoning not for end users
-                  const text = data.text.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
+                  const text = data.text
+                    .replace(/<internal>[\s\S]*?<\/internal>/g, '')
+                    .trim();
                   if (!text && !data.image) {
-                    logger.debug({ chatJid: data.chatJid, sourceGroup }, 'IPC message suppressed (internal-only)');
+                    logger.debug(
+                      { chatJid: data.chatJid, sourceGroup },
+                      'IPC message suppressed (internal-only)',
+                    );
                   } else if (data.image) {
                     // Resolve container path to host path
-                    const hostImagePath = resolveContainerPath(data.image, sourceGroup);
+                    const hostImagePath = resolveContainerPath(
+                      data.image,
+                      sourceGroup,
+                    );
                     if (fs.existsSync(hostImagePath)) {
                       if (data.sender && deps.sendWebhookImage) {
-                        await deps.sendWebhookImage(data.chatJid, hostImagePath, text, data.sender);
+                        await deps.sendWebhookImage(
+                          data.chatJid,
+                          hostImagePath,
+                          text,
+                          data.sender,
+                        );
                       } else if (deps.sendImage) {
-                        await deps.sendImage(data.chatJid, hostImagePath, text || undefined);
+                        await deps.sendImage(
+                          data.chatJid,
+                          hostImagePath,
+                          text || undefined,
+                        );
                       } else if (text) {
                         // Fallback: send text only
-                        await deps.sendMessage(data.chatJid, `${ASSISTANT_NAME}: ${text}`);
+                        await deps.sendMessage(
+                          data.chatJid,
+                          `${ASSISTANT_NAME}: ${text}`,
+                        );
                       }
                       logger.info(
-                        { chatJid: data.chatJid, sourceGroup, image: hostImagePath },
+                        {
+                          chatJid: data.chatJid,
+                          sourceGroup,
+                          image: hostImagePath,
+                        },
                         'IPC image message sent',
                       );
                     } else {
                       logger.warn(
-                        { chatJid: data.chatJid, sourceGroup, image: data.image, resolved: hostImagePath },
+                        {
+                          chatJid: data.chatJid,
+                          sourceGroup,
+                          image: data.image,
+                          resolved: hostImagePath,
+                        },
                         'IPC image file not found, sending text only',
                       );
                       if (text) {
                         if (data.sender && deps.sendWebhookMessage) {
-                          await deps.sendWebhookMessage(data.chatJid, text, data.sender);
+                          await deps.sendWebhookMessage(
+                            data.chatJid,
+                            text,
+                            data.sender,
+                          );
                         } else {
-                          await deps.sendMessage(data.chatJid, `${ASSISTANT_NAME}: ${text}`);
+                          await deps.sendMessage(
+                            data.chatJid,
+                            `${ASSISTANT_NAME}: ${text}`,
+                          );
                         }
                       }
                     }
                   } else if (data.sender && deps.sendWebhookMessage) {
-                    await deps.sendWebhookMessage(data.chatJid, text, data.sender);
+                    await deps.sendWebhookMessage(
+                      data.chatJid,
+                      text,
+                      data.sender,
+                    );
                     logger.info(
-                      { chatJid: data.chatJid, sourceGroup, sender: data.sender },
+                      {
+                        chatJid: data.chatJid,
+                        sourceGroup,
+                        sender: data.sender,
+                      },
                       'IPC webhook message sent',
                     );
                   } else {
@@ -349,9 +417,11 @@ export async function processTaskIpc(
           nextRun = scheduled.toISOString();
         }
 
-        const taskId = (typeof data.taskId === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(data.taskId))
-          ? data.taskId
-          : `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const taskId =
+          typeof data.taskId === 'string' &&
+          /^[a-zA-Z0-9_-]{1,128}$/.test(data.taskId)
+            ? data.taskId
+            : `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const contextMode =
           data.context_mode === 'group' || data.context_mode === 'isolated'
             ? data.context_mode
@@ -496,8 +566,14 @@ export async function processTaskIpc(
       const requestId = data.requestId as string | undefined;
       try {
         // update discovers new/changed files, embed creates vectors
-        execFileSync(getQmdBin(), ['update'], { timeout: 30000, stdio: 'pipe' });
-        execFileSync(getQmdBin(), ['embed', '-c', folder], { timeout: 30000, stdio: 'pipe' });
+        execFileSync(getQmdBin(), ['update'], {
+          timeout: 30000,
+          stdio: 'pipe',
+        });
+        execFileSync(getQmdBin(), ['embed', '-c', folder], {
+          timeout: 30000,
+          stdio: 'pipe',
+        });
         logger.info({ folder }, 'qmd index refreshed');
         if (requestId) {
           writeIpcResponse(sourceGroup, requestId, { ok: true });
@@ -505,7 +581,10 @@ export async function processTaskIpc(
       } catch (err) {
         logger.warn({ folder, err }, 'qmd embed failed (non-fatal)');
         if (requestId) {
-          writeIpcResponse(sourceGroup, requestId, { ok: false, error: err instanceof Error ? err.message : String(err) });
+          writeIpcResponse(sourceGroup, requestId, {
+            ok: false,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
       break;
@@ -515,21 +594,31 @@ export async function processTaskIpc(
       const requestId = data.requestId as string | undefined;
       if (!requestId) break;
 
-      const query = (data.query as string || '').slice(0, 500);
-      const mode = data.mode as string || 'keyword';
+      const query = ((data.query as string) || '').slice(0, 500);
+      const mode = (data.mode as string) || 'keyword';
       if (!query) {
-        writeIpcResponse(sourceGroup, requestId, { results: [], error: 'Missing query' });
+        writeIpcResponse(sourceGroup, requestId, {
+          results: [],
+          error: 'Missing query',
+        });
         break;
       }
 
-      const cmd = mode === 'semantic' ? 'vsearch' : mode === 'hybrid' ? 'query' : 'search';
+      const cmd =
+        mode === 'semantic'
+          ? 'vsearch'
+          : mode === 'hybrid'
+            ? 'query'
+            : 'search';
       try {
         const result = execFileSync(getQmdBin(), [cmd, '--json', query], {
           timeout: 30000,
           stdio: ['pipe', 'pipe', 'pipe'],
           encoding: 'utf-8',
         });
-        writeIpcResponse(sourceGroup, requestId, { results: JSON.parse(result) });
+        writeIpcResponse(sourceGroup, requestId, {
+          results: JSON.parse(result),
+        });
       } catch (err) {
         writeIpcResponse(sourceGroup, requestId, {
           results: [],
@@ -570,7 +659,13 @@ export async function processTaskIpc(
       const source = getSourceByHash(data.urlHash);
       writeIpcResponse(sourceGroup, requestId, {
         exists: !!source,
-        source: source ? { id: source.id, title: source.title, indexed_at: source.indexed_at } : undefined,
+        source: source
+          ? {
+              id: source.id,
+              title: source.title,
+              indexed_at: source.indexed_at,
+            }
+          : undefined,
       });
       break;
     }
@@ -581,22 +676,42 @@ export async function processTaskIpc(
       const limit = data.limit || 5;
 
       // Try qmd hybrid search first, fall back to keyword
-      let results: { id: string; text: string; source_count: number; category: string | null; score: number }[] = [];
+      let results: {
+        id: string;
+        text: string;
+        source_count: number;
+        category: string | null;
+        score: number;
+      }[] = [];
       try {
-        const qmdResult = execFileSync(getQmdBin(), ['query', '--json', data.query], {
-          timeout: 30000,
-          stdio: ['pipe', 'pipe', 'pipe'],
-          encoding: 'utf-8',
-        });
-        const qmdHits = JSON.parse(qmdResult) as { docid: string; score: number; snippet?: string }[];
+        const qmdResult = execFileSync(
+          getQmdBin(),
+          ['query', '--json', data.query],
+          {
+            timeout: 30000,
+            stdio: ['pipe', 'pipe', 'pipe'],
+            encoding: 'utf-8',
+          },
+        );
+        const qmdHits = JSON.parse(qmdResult) as {
+          docid: string;
+          score: number;
+          snippet?: string;
+        }[];
         // Match qmd results to insight records by checking if docid contains insight ID
         for (const hit of qmdHits.slice(0, limit)) {
           // Insight files are named {id}.md in insights/ dir
           // qmd returns file path in 'file' field (e.g. qmd://main/insights/{id}.md), not in 'docid'
-          const fileField = (hit as Record<string, unknown>).file as string | undefined;
-          const idMatch = (fileField || hit.docid).match(/insights\/([a-f0-9-]+)\.md/);
+          const fileField = (hit as Record<string, unknown>).file as
+            | string
+            | undefined;
+          const idMatch = (fileField || hit.docid).match(
+            /insights\/([a-f0-9-]+)\.md/,
+          );
           if (idMatch) {
-            const insight = searchInsightsKeyword(sourceGroup, '').find(i => i.id === idMatch[1]);
+            const insight = searchInsightsKeyword(sourceGroup, '').find(
+              (i) => i.id === idMatch[1],
+            );
             if (insight) {
               results.push({
                 id: insight.id,
@@ -614,9 +729,13 @@ export async function processTaskIpc(
 
       // Supplement with keyword search if qmd didn't find enough
       if (results.length < limit) {
-        const keywordResults = searchInsightsKeyword(sourceGroup, data.query, limit);
+        const keywordResults = searchInsightsKeyword(
+          sourceGroup,
+          data.query,
+          limit,
+        );
         for (const insight of keywordResults) {
-          if (!results.find(r => r.id === insight.id)) {
+          if (!results.find((r) => r.id === insight.id)) {
             results.push({
               id: insight.id,
               text: insight.text,
@@ -629,19 +748,41 @@ export async function processTaskIpc(
         results = results.slice(0, limit);
       }
 
-      logger.info({ query: data.query.slice(0, 80), resultCount: results.length, topScore: results[0]?.score }, 'Insight search via IPC');
+      logger.info(
+        {
+          query: data.query.slice(0, 80),
+          resultCount: results.length,
+          topScore: results[0]?.score,
+        },
+        'Insight search via IPC',
+      );
       writeIpcResponse(sourceGroup, requestId, { results });
       break;
     }
 
     case 'insight_add': {
       const requestId = data.requestId;
-      if (!requestId || !data.insightText || !data.sourceUrl || !data.sourceType) break;
+      if (
+        !requestId ||
+        !data.insightText ||
+        !data.sourceUrl ||
+        !data.sourceType
+      )
+        break;
 
       // Reject local file paths — agent must provide canonical URLs
-      if (data.sourceUrl.startsWith('/') || data.sourceUrl.startsWith('workspace/')) {
-        logger.warn({ sourceUrl: data.sourceUrl, sourceGroup }, 'Rejected insight source with local file path — agent must use canonical URL (e.g. YouTube watch URL)');
-        writeIpcResponse(sourceGroup, requestId, { error: 'source_url must be a canonical URL (e.g. https://www.youtube.com/watch?v=...), not a local file path. Check metadata.json for the video_id or link field.' });
+      if (
+        data.sourceUrl.startsWith('/') ||
+        data.sourceUrl.startsWith('workspace/')
+      ) {
+        logger.warn(
+          { sourceUrl: data.sourceUrl, sourceGroup },
+          'Rejected insight source with local file path — agent must use canonical URL (e.g. YouTube watch URL)',
+        );
+        writeIpcResponse(sourceGroup, requestId, {
+          error:
+            'source_url must be a canonical URL (e.g. https://www.youtube.com/watch?v=...), not a local file path. Check metadata.json for the video_id or link field.',
+        });
         break;
       }
 
@@ -695,12 +836,22 @@ export async function processTaskIpc(
 
     case 'insight_link': {
       const requestId = data.requestId;
-      if (!requestId || !data.insightId || !data.sourceUrl || !data.sourceType) break;
+      if (!requestId || !data.insightId || !data.sourceUrl || !data.sourceType)
+        break;
 
       // Reject local file paths — agent must provide canonical URLs
-      if (data.sourceUrl.startsWith('/') || data.sourceUrl.startsWith('workspace/')) {
-        logger.warn({ sourceUrl: data.sourceUrl, sourceGroup }, 'Rejected insight link with local file path — agent must use canonical URL');
-        writeIpcResponse(sourceGroup, requestId, { error: 'source_url must be a canonical URL (e.g. https://www.youtube.com/watch?v=...), not a local file path. Check metadata.json for the video_id or link field.' });
+      if (
+        data.sourceUrl.startsWith('/') ||
+        data.sourceUrl.startsWith('workspace/')
+      ) {
+        logger.warn(
+          { sourceUrl: data.sourceUrl, sourceGroup },
+          'Rejected insight link with local file path — agent must use canonical URL',
+        );
+        writeIpcResponse(sourceGroup, requestId, {
+          error:
+            'source_url must be a canonical URL (e.g. https://www.youtube.com/watch?v=...), not a local file path. Check metadata.json for the video_id or link field.',
+        });
         break;
       }
 
@@ -721,17 +872,27 @@ export async function processTaskIpc(
       }
 
       // Link and bump count
-      linkInsightSource(data.insightId, sourceHash, data.context, data.timestampRef);
+      linkInsightSource(
+        data.insightId,
+        sourceHash,
+        data.context,
+        data.timestampRef,
+      );
 
       // Get updated count
-      const updated = getTopInsights(sourceGroup, 1, 0).insights.find(i => i.id === data.insightId);
+      const updated = getTopInsights(sourceGroup, 1, 0).insights.find(
+        (i) => i.id === data.insightId,
+      );
 
       writeIpcResponse(sourceGroup, requestId, {
         insight_id: data.insightId,
         source_id: sourceHash,
         new_source_count: updated?.source_count ?? 1,
       });
-      logger.info({ insightId: data.insightId, sourceGroup }, 'Insight source linked via IPC');
+      logger.info(
+        { insightId: data.insightId, sourceGroup },
+        'Insight source linked via IPC',
+      );
       break;
     }
 
@@ -742,7 +903,13 @@ export async function processTaskIpc(
       const sortBy = data.sortBy === 'recent' ? 'recent' : 'source_count';
       const limit = data.limit || 20;
       const offset = data.offset || 0;
-      const result = getTopInsights(sourceGroup, limit, offset, data.category, sortBy as 'source_count' | 'recent');
+      const result = getTopInsights(
+        sourceGroup,
+        limit,
+        offset,
+        data.category,
+        sortBy as 'source_count' | 'recent',
+      );
       writeIpcResponse(sourceGroup, requestId, result);
       break;
     }
@@ -751,9 +918,16 @@ export async function processTaskIpc(
       const requestId = data.requestId;
       if (!requestId) break;
 
-      const scriptPath = path.join(process.cwd(), 'scripts', 'dedup-insights.py');
+      const scriptPath = path.join(
+        process.cwd(),
+        'scripts',
+        'dedup-insights.py',
+      );
       if (!fs.existsSync(scriptPath)) {
-        writeIpcResponse(sourceGroup, requestId, { ok: false, error: 'dedup-insights.py not found' });
+        writeIpcResponse(sourceGroup, requestId, {
+          ok: false,
+          error: 'dedup-insights.py not found',
+        });
         break;
       }
 
@@ -761,7 +935,10 @@ export async function processTaskIpc(
       if (data.threshold) args.push('--threshold', String(data.threshold));
       if (data.dryRun) args.push('--dry-run');
 
-      logger.info({ sourceGroup, threshold: data.threshold }, 'Running dedup-insights');
+      logger.info(
+        { sourceGroup, threshold: data.threshold },
+        'Running dedup-insights',
+      );
       try {
         const output = execFileSync('python3', args, {
           timeout: 600_000, // 10 minute timeout
@@ -769,13 +946,26 @@ export async function processTaskIpc(
           maxBuffer: 10 * 1024 * 1024,
         });
         const lines = output.trim().split('\n');
-        const summaryStart = lines.findIndex(l => l.includes('DEDUP COMPLETE'));
-        const summary = summaryStart >= 0 ? lines.slice(summaryStart).join('\n') : lines.slice(-5).join('\n');
-        writeIpcResponse(sourceGroup, requestId, { ok: true, output: summary, fullOutput: output });
+        const summaryStart = lines.findIndex((l) =>
+          l.includes('DEDUP COMPLETE'),
+        );
+        const summary =
+          summaryStart >= 0
+            ? lines.slice(summaryStart).join('\n')
+            : lines.slice(-5).join('\n');
+        writeIpcResponse(sourceGroup, requestId, {
+          ok: true,
+          output: summary,
+          fullOutput: output,
+        });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         const stdout = (err as { stdout?: string }).stdout || '';
-        writeIpcResponse(sourceGroup, requestId, { ok: false, error: message, output: stdout });
+        writeIpcResponse(sourceGroup, requestId, {
+          ok: false,
+          error: message,
+          output: stdout,
+        });
       }
       break;
     }
@@ -784,21 +974,26 @@ export async function processTaskIpc(
       const requestId = data.requestId;
       if (!requestId) break;
 
-      const method = (data.method as string || 'GET').toUpperCase();
+      const method = ((data.method as string) || 'GET').toUpperCase();
       const apiPath = data.path as string;
       if (!apiPath || !apiPath.startsWith('/api/')) {
-        writeIpcResponse(sourceGroup, requestId, { error: 'Path must start with /api/' });
+        writeIpcResponse(sourceGroup, requestId, {
+          error: 'Path must start with /api/',
+        });
         break;
       }
 
-      const paperclipApiUrl = process.env.PAPERCLIP_API_URL || 'http://127.0.0.1:3101';
+      const paperclipApiUrl =
+        process.env.PAPERCLIP_API_URL || 'http://127.0.0.1:3101';
       const paperclipApiKey = process.env.PAPERCLIP_API_KEY || '';
       const url = `${paperclipApiUrl}${apiPath}`;
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        ...(paperclipApiKey ? { 'Authorization': `Bearer ${paperclipApiKey}` } : {}),
-        ...(data.headers as Record<string, string> || {}),
+        ...(paperclipApiKey
+          ? { Authorization: `Bearer ${paperclipApiKey}` }
+          : {}),
+        ...((data.headers as Record<string, string>) || {}),
       };
 
       try {
@@ -837,7 +1032,11 @@ export async function processTaskIpc(
 }
 
 /** Write a response file for a request-response IPC call */
-function writeIpcResponse(sourceGroup: string, requestId: string, data: unknown): void {
+function writeIpcResponse(
+  sourceGroup: string,
+  requestId: string,
+  data: unknown,
+): void {
   const responsesDir = path.join(DATA_DIR, 'ipc', sourceGroup, 'responses');
   fs.mkdirSync(responsesDir, { recursive: true });
   const responsePath = path.join(responsesDir, `${requestId}.json`);

@@ -10,7 +10,9 @@ export const TELEGRAM_ONLY = process.env.TELEGRAM_ONLY === 'true';
 
 export const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || '';
 export const DISCORD_ONLY = process.env.DISCORD_ONLY === 'true';
-export const DISCORD_WEBHOOK_URLS: string[] = (process.env.DISCORD_WEBHOOK_URLS || '')
+export const DISCORD_WEBHOOK_URLS: string[] = (
+  process.env.DISCORD_WEBHOOK_URLS || ''
+)
   .split(',')
   .map((t) => t.trim())
   .filter(Boolean);
@@ -42,10 +44,7 @@ export const CONTAINER_MAX_OUTPUT_SIZE = parseInt(
   10,
 ); // 10MB default
 export const IPC_POLL_INTERVAL = 1000;
-export const IDLE_TIMEOUT = parseInt(
-  process.env.IDLE_TIMEOUT || '1800000',
-  10,
-); // 30min default — how long to keep container alive after last result
+export const IDLE_TIMEOUT = parseInt(process.env.IDLE_TIMEOUT || '1800000', 10); // 30min default — how long to keep container alive after last result
 export const MAX_CONCURRENT_CONTAINERS = Math.max(
   1,
   parseInt(process.env.MAX_CONCURRENT_CONTAINERS || '5', 10) || 5,

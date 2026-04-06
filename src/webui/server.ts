@@ -51,7 +51,10 @@ export async function startWebServer(deps: ServerDeps): Promise<void> {
   }
 
   // Health check
-  app.get('/api/health', async () => ({ status: 'ok', uptime: process.uptime() }));
+  app.get('/api/health', async () => ({
+    status: 'ok',
+    uptime: process.uptime(),
+  }));
 
   // Register all API routes
   registerOverviewRoutes(app, deps);
@@ -85,7 +88,9 @@ export async function startWebServer(deps: ServerDeps): Promise<void> {
     try {
       return reply.sendFile('index.html');
     } catch {
-      return reply.status(404).send({ error: 'UI not built. Run: cd ui && npm run build' });
+      return reply
+        .status(404)
+        .send({ error: 'UI not built. Run: cd ui && npm run build' });
     }
   });
 

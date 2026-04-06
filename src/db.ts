@@ -6,7 +6,12 @@ import path from 'path';
 import { DATA_DIR, STORE_DIR } from './config.js';
 import { isValidGroupFolder } from './group-folder.js';
 import { logger } from './logger.js';
-import { NewMessage, RegisteredGroup, ScheduledTask, TaskRunLog } from './types.js';
+import {
+  NewMessage,
+  RegisteredGroup,
+  ScheduledTask,
+  TaskRunLog,
+} from './types.js';
 
 let db: Database.Database;
 
@@ -133,14 +138,17 @@ function createSchema(database: Database.Database): void {
 export function inferChannelFromJid(jid: string): string {
   if (jid.startsWith('tg:')) return 'telegram';
   if (jid.startsWith('dc:')) return 'discord';
-  if (jid.endsWith('@g.us') || jid.endsWith('@s.whatsapp.net')) return 'whatsapp';
+  if (jid.endsWith('@g.us') || jid.endsWith('@s.whatsapp.net'))
+    return 'whatsapp';
   return 'unknown';
 }
 
 /** Get all JIDs that share a folder (for multi-channel broadcast) */
 export function getJidsForFolder(folder: string): string[] {
-  const rows = db.prepare('SELECT jid FROM registered_groups WHERE folder = ?').all(folder) as Array<{ jid: string }>;
-  return rows.map(r => r.jid);
+  const rows = db
+    .prepare('SELECT jid FROM registered_groups WHERE folder = ?')
+    .all(folder) as Array<{ jid: string }>;
+  return rows.map((r) => r.jid);
 }
 
 /**
@@ -150,9 +158,11 @@ export function getJidsForFolder(folder: string): string[] {
  */
 function migrateRegisteredGroupsSchema(database: Database.Database): void {
   // Check if folder has UNIQUE constraint (old schema)
-  const tableInfo = database.prepare(
-    `SELECT sql FROM sqlite_master WHERE type='table' AND name='registered_groups'`
-  ).get() as { sql: string } | undefined;
+  const tableInfo = database
+    .prepare(
+      `SELECT sql FROM sqlite_master WHERE type='table' AND name='registered_groups'`,
+    )
+    .get() as { sql: string } | undefined;
 
   if (!tableInfo) return;
 
@@ -180,7 +190,9 @@ function migrateRegisteredGroupsSchema(database: Database.Database): void {
       ALTER TABLE registered_groups_new RENAME TO registered_groups;
       CREATE INDEX IF NOT EXISTS idx_registered_groups_folder ON registered_groups(folder);
     `);
-    logger.info('Migrated registered_groups: removed UNIQUE on folder, added channel column');
+    logger.info(
+      'Migrated registered_groups: removed UNIQUE on folder, added channel column',
+    );
   } else if (!hasChannel) {
     try {
       database.exec(`ALTER TABLE registered_groups ADD COLUMN channel TEXT`);
@@ -191,13 +203,20 @@ function migrateRegisteredGroupsSchema(database: Database.Database): void {
   }
 
   // Backfill channel from JID patterns
-  const rows = database.prepare('SELECT jid FROM registered_groups WHERE channel IS NULL').all() as Array<{ jid: string }>;
+  const rows = database
+    .prepare('SELECT jid FROM registered_groups WHERE channel IS NULL')
+    .all() as Array<{ jid: string }>;
   if (rows.length > 0) {
-    const stmt = database.prepare('UPDATE registered_groups SET channel = ? WHERE jid = ?');
+    const stmt = database.prepare(
+      'UPDATE registered_groups SET channel = ? WHERE jid = ?',
+    );
     for (const row of rows) {
       stmt.run(inferChannelFromJid(row.jid), row.jid);
     }
-    logger.info({ count: rows.length }, 'Backfilled channel column in registered_groups');
+    logger.info(
+      { count: rows.length },
+      'Backfilled channel column in registered_groups',
+    );
   }
 }
 
@@ -601,7 +620,10 @@ export function getRegisteredGroup(
     try {
       containerConfig = JSON.parse(row.container_config);
     } catch (err) {
-      logger.error({ jid, raw: row.container_config, error: err }, 'Corrupt container_config in registered_groups, ignoring');
+      logger.error(
+        { jid, raw: row.container_config, error: err },
+        'Corrupt container_config in registered_groups, ignoring',
+      );
     }
   }
 
@@ -612,15 +634,13 @@ export function getRegisteredGroup(
     trigger: row.trigger_pattern,
     added_at: row.added_at,
     containerConfig,
-    requiresTrigger: row.requires_trigger === null ? undefined : row.requires_trigger === 1,
+    requiresTrigger:
+      row.requires_trigger === null ? undefined : row.requires_trigger === 1,
     channel: row.channel || undefined,
   };
 }
 
-export function setRegisteredGroup(
-  jid: string,
-  group: RegisteredGroup,
-): void {
+export function setRegisteredGroup(jid: string, group: RegisteredGroup): void {
   if (!isValidGroupFolder(group.folder)) {
     throw new Error(`Invalid group folder name: ${group.folder}`);
   }
@@ -648,9 +668,7 @@ export function setRegisteredGroup(
 }
 
 export function getAllRegisteredGroups(): Record<string, RegisteredGroup> {
-  const rows = db
-    .prepare('SELECT * FROM registered_groups')
-    .all() as Array<{
+  const rows = db.prepare('SELECT * FROM registered_groups').all() as Array<{
     jid: string;
     name: string;
     folder: string;
@@ -671,7 +689,10 @@ export function getAllRegisteredGroups(): Record<string, RegisteredGroup> {
       try {
         containerConfig = JSON.parse(row.container_config);
       } catch (err) {
-        logger.error({ jid: row.jid, raw: row.container_config, error: err }, 'Corrupt container_config in registered_groups, ignoring');
+        logger.error(
+          { jid: row.jid, raw: row.container_config, error: err },
+          'Corrupt container_config in registered_groups, ignoring',
+        );
       }
     }
 
@@ -681,7 +702,8 @@ export function getAllRegisteredGroups(): Record<string, RegisteredGroup> {
       trigger: row.trigger_pattern,
       added_at: row.added_at,
       containerConfig,
-      requiresTrigger: row.requires_trigger === null ? undefined : row.requires_trigger === 1,
+      requiresTrigger:
+        row.requires_trigger === null ? undefined : row.requires_trigger === 1,
       channel: row.channel || undefined,
     };
   }
@@ -732,10 +754,23 @@ export function deleteSession(groupFolder: string): void {
 }
 
 export function getDbStats(): Record<string, number> {
-  const tables = ['chats', 'messages', 'scheduled_tasks', 'task_run_logs', 'sessions', 'registered_groups', 'router_state', 'insights', 'insight_sources', 'insight_source_links'];
+  const tables = [
+    'chats',
+    'messages',
+    'scheduled_tasks',
+    'task_run_logs',
+    'sessions',
+    'registered_groups',
+    'router_state',
+    'insights',
+    'insight_sources',
+    'insight_source_links',
+  ];
   const stats: Record<string, number> = {};
   for (const table of tables) {
-    const row = db.prepare(`SELECT COUNT(*) as count FROM ${table}`).get() as { count: number };
+    const row = db.prepare(`SELECT COUNT(*) as count FROM ${table}`).get() as {
+      count: number;
+    };
     stats[table] = row.count;
   }
   return stats;
@@ -783,7 +818,9 @@ export interface InsightSourceLink {
 export function hashSourceUrl(url: string): string {
   let normalized = url.trim();
   // Normalize YouTube URLs to canonical form
-  const ytMatch = normalized.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  const ytMatch = normalized.match(
+    /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+  );
   if (ytMatch) {
     normalized = `https://www.youtube.com/watch?v=${ytMatch[1]}`;
   } else {
@@ -791,7 +828,16 @@ export function hashSourceUrl(url: string): string {
       const u = new URL(normalized);
       u.hash = '';
       // Strip common tracking params
-      for (const p of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'gclid', 'ref']) {
+      for (const p of [
+        'utm_source',
+        'utm_medium',
+        'utm_campaign',
+        'utm_term',
+        'utm_content',
+        'fbclid',
+        'gclid',
+        'ref',
+      ]) {
         u.searchParams.delete(p);
       }
       normalized = u.toString();
@@ -803,29 +849,61 @@ export function hashSourceUrl(url: string): string {
 }
 
 export function getSourceByHash(id: string): InsightSource | undefined {
-  return db.prepare('SELECT * FROM insight_sources WHERE id = ?').get(id) as InsightSource | undefined;
+  return db.prepare('SELECT * FROM insight_sources WHERE id = ?').get(id) as
+    | InsightSource
+    | undefined;
 }
 
 export function createSource(source: InsightSource): void {
   db.prepare(
     'INSERT OR IGNORE INTO insight_sources (id, url, title, source_type, metadata, indexed_at) VALUES (?, ?, ?, ?, ?, ?)',
-  ).run(source.id, source.url, source.title, source.source_type, source.metadata, source.indexed_at);
+  ).run(
+    source.id,
+    source.url,
+    source.title,
+    source.source_type,
+    source.metadata,
+    source.indexed_at,
+  );
 }
 
 export function createInsight(insight: Insight): void {
   db.prepare(
     'INSERT INTO insights (id, text, detail, category, source_count, first_seen, last_seen, group_folder) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-  ).run(insight.id, insight.text, insight.detail, insight.category, insight.source_count, insight.first_seen, insight.last_seen, insight.group_folder);
+  ).run(
+    insight.id,
+    insight.text,
+    insight.detail,
+    insight.category,
+    insight.source_count,
+    insight.first_seen,
+    insight.last_seen,
+    insight.group_folder,
+  );
 }
 
-export function getInsightById(id: string): (Insight & { sources: (InsightSource & { context: string | null; timestamp_ref: string | null })[] }) | undefined {
-  const insight = db.prepare('SELECT * FROM insights WHERE id = ?').get(id) as Insight | undefined;
+export function getInsightById(id: string):
+  | (Insight & {
+      sources: (InsightSource & {
+        context: string | null;
+        timestamp_ref: string | null;
+      })[];
+    })
+  | undefined {
+  const insight = db.prepare('SELECT * FROM insights WHERE id = ?').get(id) as
+    | Insight
+    | undefined;
   if (!insight) return undefined;
-  const sources = db.prepare(
-    `SELECT s.*, l.context, l.timestamp_ref FROM insight_sources s
+  const sources = db
+    .prepare(
+      `SELECT s.*, l.context, l.timestamp_ref FROM insight_sources s
      JOIN insight_source_links l ON l.source_id = s.id
      WHERE l.insight_id = ? ORDER BY l.linked_at DESC`,
-  ).all(id) as (InsightSource & { context: string | null; timestamp_ref: string | null })[];
+    )
+    .all(id) as (InsightSource & {
+    context: string | null;
+    timestamp_ref: string | null;
+  })[];
   return { ...insight, sources };
 }
 
@@ -856,37 +934,65 @@ export function getTopInsights(
     : 'WHERE group_folder = ?';
   const params = category ? [groupFolder, category] : [groupFolder];
 
-  const orderCol = sortBy === 'recent' ? 'last_seen DESC' : 'source_count DESC, last_seen DESC';
+  const orderCol =
+    sortBy === 'recent'
+      ? 'last_seen DESC'
+      : 'source_count DESC, last_seen DESC';
 
-  const total = (db.prepare(`SELECT COUNT(*) as count FROM insights ${where}`).get(...params) as { count: number }).count;
-  const insights = db.prepare(
-    `SELECT * FROM insights ${where} ORDER BY ${orderCol} LIMIT ? OFFSET ?`,
-  ).all(...params, limit, offset) as Insight[];
+  const total = (
+    db
+      .prepare(`SELECT COUNT(*) as count FROM insights ${where}`)
+      .get(...params) as { count: number }
+  ).count;
+  const insights = db
+    .prepare(
+      `SELECT * FROM insights ${where} ORDER BY ${orderCol} LIMIT ? OFFSET ?`,
+    )
+    .all(...params, limit, offset) as Insight[];
   return { insights, total };
 }
 
 export function getInsightsBySource(sourceId: string): Insight[] {
-  return db.prepare(
-    `SELECT i.* FROM insights i
+  return db
+    .prepare(
+      `SELECT i.* FROM insights i
      JOIN insight_source_links l ON l.insight_id = i.id
      WHERE l.source_id = ? ORDER BY i.source_count DESC`,
-  ).all(sourceId) as Insight[];
+    )
+    .all(sourceId) as Insight[];
 }
 
-export function getInsightSources(insightId: string): (InsightSource & { context: string | null; timestamp_ref: string | null })[] {
-  return db.prepare(
-    `SELECT s.*, l.context, l.timestamp_ref FROM insight_sources s
+export function getInsightSources(insightId: string): (InsightSource & {
+  context: string | null;
+  timestamp_ref: string | null;
+})[] {
+  return db
+    .prepare(
+      `SELECT s.*, l.context, l.timestamp_ref FROM insight_sources s
      JOIN insight_source_links l ON l.source_id = s.id
      WHERE l.insight_id = ? ORDER BY l.linked_at DESC`,
-  ).all(insightId) as (InsightSource & { context: string | null; timestamp_ref: string | null })[];
+    )
+    .all(insightId) as (InsightSource & {
+    context: string | null;
+    timestamp_ref: string | null;
+  })[];
 }
 
-export function getAllInsightSources(limit = 50, offset = 0): { sources: (InsightSource & { insight_count: number })[]; total: number } {
-  const total = (db.prepare('SELECT COUNT(*) as count FROM insight_sources').get() as { count: number }).count;
-  const sources = db.prepare(
-    `SELECT s.*, (SELECT COUNT(*) FROM insight_source_links l WHERE l.source_id = s.id) as insight_count
+export function getAllInsightSources(
+  limit = 50,
+  offset = 0,
+): { sources: (InsightSource & { insight_count: number })[]; total: number } {
+  const total = (
+    db.prepare('SELECT COUNT(*) as count FROM insight_sources').get() as {
+      count: number;
+    }
+  ).count;
+  const sources = db
+    .prepare(
+      `SELECT s.*, (SELECT COUNT(*) FROM insight_source_links l WHERE l.source_id = s.id) as insight_count
      FROM insight_sources s ORDER BY s.indexed_at DESC LIMIT ? OFFSET ?`,
-  ).all(limit, offset) as (InsightSource & { insight_count: number })[];
+    )
+    .all(limit, offset) as (InsightSource & { insight_count: number })[];
   return { sources, total };
 }
 
@@ -895,15 +1001,29 @@ export function deleteInsight(id: string): void {
   db.prepare('DELETE FROM insights WHERE id = ?').run(id);
 }
 
-export function updateInsightFields(id: string, updates: { text?: string; detail?: string; category?: string }): void {
+export function updateInsightFields(
+  id: string,
+  updates: { text?: string; detail?: string; category?: string },
+): void {
   const fields: string[] = [];
   const values: unknown[] = [];
-  if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text); }
-  if (updates.detail !== undefined) { fields.push('detail = ?'); values.push(updates.detail); }
-  if (updates.category !== undefined) { fields.push('category = ?'); values.push(updates.category); }
+  if (updates.text !== undefined) {
+    fields.push('text = ?');
+    values.push(updates.text);
+  }
+  if (updates.detail !== undefined) {
+    fields.push('detail = ?');
+    values.push(updates.detail);
+  }
+  if (updates.category !== undefined) {
+    fields.push('category = ?');
+    values.push(updates.category);
+  }
   if (fields.length === 0) return;
   values.push(id);
-  db.prepare(`UPDATE insights SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  db.prepare(`UPDATE insights SET ${fields.join(', ')} WHERE id = ?`).run(
+    ...values,
+  );
 }
 
 export function getInsightStats(groupFolder: string): {
@@ -912,30 +1032,49 @@ export function getInsightStats(groupFolder: string): {
   topInsight: { text: string; source_count: number } | null;
   categories: { category: string; count: number }[];
 } {
-  const totalInsights = (db.prepare(
-    'SELECT COUNT(*) as count FROM insights WHERE group_folder = ?',
-  ).get(groupFolder) as { count: number }).count;
-  const totalSources = (db.prepare(
-    `SELECT COUNT(DISTINCT s.id) as count FROM insight_sources s
+  const totalInsights = (
+    db
+      .prepare('SELECT COUNT(*) as count FROM insights WHERE group_folder = ?')
+      .get(groupFolder) as { count: number }
+  ).count;
+  const totalSources = (
+    db
+      .prepare(
+        `SELECT COUNT(DISTINCT s.id) as count FROM insight_sources s
      JOIN insight_source_links l ON l.source_id = s.id
      JOIN insights i ON i.id = l.insight_id
      WHERE i.group_folder = ?`,
-  ).get(groupFolder) as { count: number }).count;
-  const topInsight = db.prepare(
-    'SELECT text, source_count FROM insights WHERE group_folder = ? ORDER BY source_count DESC LIMIT 1',
-  ).get(groupFolder) as { text: string; source_count: number } | undefined ?? null;
-  const categories = db.prepare(
-    `SELECT COALESCE(category, 'uncategorized') as category, COUNT(*) as count
+      )
+      .get(groupFolder) as { count: number }
+  ).count;
+  const topInsight =
+    (db
+      .prepare(
+        'SELECT text, source_count FROM insights WHERE group_folder = ? ORDER BY source_count DESC LIMIT 1',
+      )
+      .get(groupFolder) as
+      | { text: string; source_count: number }
+      | undefined) ?? null;
+  const categories = db
+    .prepare(
+      `SELECT COALESCE(category, 'uncategorized') as category, COUNT(*) as count
      FROM insights WHERE group_folder = ? GROUP BY category ORDER BY count DESC`,
-  ).all(groupFolder) as { category: string; count: number }[];
+    )
+    .all(groupFolder) as { category: string; count: number }[];
   return { totalInsights, totalSources, topInsight, categories };
 }
 
-export function searchInsightsKeyword(groupFolder: string, query: string, limit = 10): Insight[] {
+export function searchInsightsKeyword(
+  groupFolder: string,
+  query: string,
+  limit = 10,
+): Insight[] {
   const pattern = `%${query}%`;
-  return db.prepare(
-    'SELECT * FROM insights WHERE group_folder = ? AND text LIKE ? ORDER BY source_count DESC LIMIT ?',
-  ).all(groupFolder, pattern, limit) as Insight[];
+  return db
+    .prepare(
+      'SELECT * FROM insights WHERE group_folder = ? AND text LIKE ? ORDER BY source_count DESC LIMIT ?',
+    )
+    .all(groupFolder, pattern, limit) as Insight[];
 }
 
 export function getInsightActivity(groupFolder: string): {
@@ -945,42 +1084,62 @@ export function getInsightActivity(groupFolder: string): {
   avgSourcesPerInsight: number;
   lastRefresh: string | null;
 } {
-  const sourceTypeBreakdown = db.prepare(
-    `SELECT s.source_type, COUNT(DISTINCT s.id) as count
+  const sourceTypeBreakdown = db
+    .prepare(
+      `SELECT s.source_type, COUNT(DISTINCT s.id) as count
      FROM insight_sources s
      JOIN insight_source_links l ON l.source_id = s.id
      JOIN insights i ON i.id = l.insight_id
      WHERE i.group_folder = ?
      GROUP BY s.source_type ORDER BY count DESC`,
-  ).all(groupFolder) as { source_type: string; count: number }[];
+    )
+    .all(groupFolder) as { source_type: string; count: number }[];
 
-  const categoryDistribution = db.prepare(
-    `SELECT COALESCE(category, 'uncategorized') as category, COUNT(*) as count
+  const categoryDistribution = db
+    .prepare(
+      `SELECT COALESCE(category, 'uncategorized') as category, COUNT(*) as count
      FROM insights WHERE group_folder = ? GROUP BY category ORDER BY count DESC`,
-  ).all(groupFolder) as { category: string; count: number }[];
+    )
+    .all(groupFolder) as { category: string; count: number }[];
 
-  const last24h = (db.prepare(
-    "SELECT COUNT(*) as count FROM insights WHERE group_folder = ? AND first_seen >= datetime('now', '-1 day')",
-  ).get(groupFolder) as { count: number }).count;
-  const last7d = (db.prepare(
-    "SELECT COUNT(*) as count FROM insights WHERE group_folder = ? AND first_seen >= datetime('now', '-7 days')",
-  ).get(groupFolder) as { count: number }).count;
-  const last30d = (db.prepare(
-    "SELECT COUNT(*) as count FROM insights WHERE group_folder = ? AND first_seen >= datetime('now', '-30 days')",
-  ).get(groupFolder) as { count: number }).count;
+  const last24h = (
+    db
+      .prepare(
+        "SELECT COUNT(*) as count FROM insights WHERE group_folder = ? AND first_seen >= datetime('now', '-1 day')",
+      )
+      .get(groupFolder) as { count: number }
+  ).count;
+  const last7d = (
+    db
+      .prepare(
+        "SELECT COUNT(*) as count FROM insights WHERE group_folder = ? AND first_seen >= datetime('now', '-7 days')",
+      )
+      .get(groupFolder) as { count: number }
+  ).count;
+  const last30d = (
+    db
+      .prepare(
+        "SELECT COUNT(*) as count FROM insights WHERE group_folder = ? AND first_seen >= datetime('now', '-30 days')",
+      )
+      .get(groupFolder) as { count: number }
+  ).count;
 
-  const avgRow = db.prepare(
-    'SELECT AVG(source_count) as avg FROM insights WHERE group_folder = ?',
-  ).get(groupFolder) as { avg: number | null };
+  const avgRow = db
+    .prepare(
+      'SELECT AVG(source_count) as avg FROM insights WHERE group_folder = ?',
+    )
+    .get(groupFolder) as { avg: number | null };
   const avgSourcesPerInsight = Math.round((avgRow.avg || 0) * 100) / 100;
 
-  const lastRefreshRow = db.prepare(
-    `SELECT MAX(s.indexed_at) as last_refresh
+  const lastRefreshRow = db
+    .prepare(
+      `SELECT MAX(s.indexed_at) as last_refresh
      FROM insight_sources s
      JOIN insight_source_links l ON l.source_id = s.id
      JOIN insights i ON i.id = l.insight_id
      WHERE i.group_folder = ?`,
-  ).get(groupFolder) as { last_refresh: string | null };
+    )
+    .get(groupFolder) as { last_refresh: string | null };
 
   return {
     sourceTypeBreakdown,

@@ -8,12 +8,30 @@
 // those false-positive on normal code/URL discussions.
 const INJECTION_PATTERNS: { pattern: RegExp; label: string }[] = [
   // System prompt override attempts
-  { pattern: /ignore\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?)/i, label: 'system-override' },
-  { pattern: /disregard\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?)/i, label: 'system-override' },
-  { pattern: /forget\s+(everything|all|previous|prior)\s+(instructions?|prompts?|rules?)/i, label: 'system-override' },
-  { pattern: /new\s+(instructions?|system\s*prompts?|rules?)[\s:]/i, label: 'system-override' },
+  {
+    pattern:
+      /ignore\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?)/i,
+    label: 'system-override',
+  },
+  {
+    pattern:
+      /disregard\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?)/i,
+    label: 'system-override',
+  },
+  {
+    pattern:
+      /forget\s+(everything|all|previous|prior)\s+(instructions?|prompts?|rules?)/i,
+    label: 'system-override',
+  },
+  {
+    pattern: /new\s+(instructions?|system\s*prompts?|rules?)[\s:]/i,
+    label: 'system-override',
+  },
   { pattern: /you\s+are\s+now\s+(a|an|the)\b/i, label: 'identity-override' },
-  { pattern: /act\s+as\s+(if\s+you\s+are|though\s+you\s+are)/i, label: 'identity-override' },
+  {
+    pattern: /act\s+as\s+(if\s+you\s+are|though\s+you\s+are)/i,
+    label: 'identity-override',
+  },
   { pattern: /pretend\s+(to\s+be|you\s+are)/i, label: 'identity-override' },
   { pattern: /roleplay\s+as/i, label: 'identity-override' },
 
@@ -84,13 +102,20 @@ export function sanitizePrompt(text: string): SanitizeResult {
   }
 
   // Strip control characters first (keep newlines, tabs)
-  let sanitized = text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '');
+  let sanitized = text.replace(
+    /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g,
+    '',
+  );
 
   // --- Block-level checks (message rejected entirely) ---
 
   // Excessive special characters → likely obfuscated/encoded payload
-  const specialCharCount = (sanitized.match(/[^a-zA-Z0-9\s.,!?'"-]/g) || []).length;
-  if (sanitized.length > 0 && specialCharCount / sanitized.length > SPECIAL_CHAR_BLOCK_RATIO) {
+  const specialCharCount = (sanitized.match(/[^a-zA-Z0-9\s.,!?'"-]/g) || [])
+    .length;
+  if (
+    sanitized.length > 0 &&
+    specialCharCount / sanitized.length > SPECIAL_CHAR_BLOCK_RATIO
+  ) {
     return {
       safe: false,
       blocked: true,

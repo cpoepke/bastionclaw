@@ -17,13 +17,14 @@ import { synthesizeSpeech } from '../tts.js';
 import { resolveGroupFolderPath } from '../group-folder.js';
 
 import { STORE_DIR } from '../config.js';
-import {
-  getLastGroupSync,
-  setLastGroupSync,
-  updateChatName,
-} from '../db.js';
+import { getLastGroupSync, setLastGroupSync, updateChatName } from '../db.js';
 import { logger } from '../logger.js';
-import { Channel, OnInboundMessage, OnChatMetadata, RegisteredGroup } from '../types.js';
+import {
+  Channel,
+  OnInboundMessage,
+  OnChatMetadata,
+  RegisteredGroup,
+} from '../types.js';
 
 const GROUP_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -31,7 +32,7 @@ const TTS_MAX_CHARS = 1500;
 
 function shouldUseTTS(text: string): boolean {
   if (text.length > TTS_MAX_CHARS) return false; // too long — text is better
-  if (text.includes('```')) return false;         // contains code block
+  if (text.includes('```')) return false; // contains code block
   return true;
 }
 
@@ -45,18 +46,30 @@ function detectResponseModeOverride(text: string): 'voice' | 'text' | null {
 
   // Explicit voice request (English + German)
   if (
-    /\b(reply|respond|answer|antworte?)\s+(with|via|in|als|mit)\s+voice\b/.test(t) ||
-    /\b(voice\s+(reply|note\s+back|back)|sprich\s+zurück|sprachnachricht\s+zurück)\b/.test(t) ||
+    /\b(reply|respond|answer|antworte?)\s+(with|via|in|als|mit)\s+voice\b/.test(
+      t,
+    ) ||
+    /\b(voice\s+(reply|note\s+back|back)|sprich\s+zurück|sprachnachricht\s+zurück)\b/.test(
+      t,
+    ) ||
     /\bantworte?\s+(als\s+)?sprachnachricht\b/.test(t) ||
     /\bschick\s+(eine\s+)?sprachnachricht\b/.test(t)
-  ) return 'voice';
+  )
+    return 'voice';
 
   // Explicit text request (English + German)
   if (
-    /\b(reply|respond|answer|antworte?)\s+(in|with|via|als|per|mit)\s+text\b/.test(t) ||
-    /\b(text\s+reply|text\s+back|write\s+(it\s+)?back|type\s+(your\s+)?answer)\b/.test(t) ||
-    /\b(textantwort|schreib\s+zurück|antworte?\s+schriftlich|antworte?\s+per\s+text)\b/.test(t)
-  ) return 'text';
+    /\b(reply|respond|answer|antworte?)\s+(in|with|via|als|per|mit)\s+text\b/.test(
+      t,
+    ) ||
+    /\b(text\s+reply|text\s+back|write\s+(it\s+)?back|type\s+(your\s+)?answer)\b/.test(
+      t,
+    ) ||
+    /\b(textantwort|schreib\s+zurück|antworte?\s+schriftlich|antworte?\s+per\s+text)\b/.test(
+      t,
+    )
+  )
+    return 'text';
 
   return null;
 }
@@ -126,10 +139,19 @@ export class WhatsAppChannel implements Channel {
 
       if (connection === 'close') {
         this.connected = false;
-        const errObj = lastDisconnect?.error as { output?: { statusCode?: number } } | undefined;
+        const errObj = lastDisconnect?.error as
+          | { output?: { statusCode?: number } }
+          | undefined;
         const reason = errObj?.output?.statusCode;
         const shouldReconnect = reason !== DisconnectReason.loggedOut;
-        logger.info({ reason, shouldReconnect, queuedMessages: this.outgoingQueue.length }, 'Connection closed');
+        logger.info(
+          {
+            reason,
+            shouldReconnect,
+            queuedMessages: this.outgoingQueue.length,
+          },
+          'Connection closed',
+        );
 
         if (shouldReconnect) {
           logger.info('Reconnecting...');
@@ -213,16 +235,30 @@ export class WhatsAppChannel implements Channel {
             msg.message?.videoMessage?.caption ||
             '';
 
-          if (!content && msg.message?.audioMessage?.ptt && process.env.GROQ_API_KEY) {
+          if (
+            !content &&
+            msg.message?.audioMessage?.ptt &&
+            process.env.GROQ_API_KEY
+          ) {
             try {
               const start = Date.now();
-              const buffer = await downloadMediaMessage(msg, 'buffer', {}) as Buffer;
+              const buffer = (await downloadMediaMessage(
+                msg,
+                'buffer',
+                {},
+              )) as Buffer;
               const transcript = await transcribeAudio(buffer);
               content = '[Voice] ' + transcript;
               // Detect explicit override in the transcript; default for PTT is voice
               const override = detectResponseModeOverride(transcript);
               this.pendingReplyMode.set(chatJid, override ?? 'voice');
-              logger.info({ duration: Date.now() - start, replyMode: override ?? 'voice' }, 'Voice message transcribed');
+              logger.info(
+                {
+                  duration: Date.now() - start,
+                  replyMode: override ?? 'voice',
+                },
+                'Voice message transcribed',
+              );
             } catch (err) {
               logger.warn({ err }, 'Voice transcription failed');
               content = '[Voice message - transcription failed]';
@@ -232,12 +268,19 @@ export class WhatsAppChannel implements Channel {
           if (!content && msg.message?.imageMessage) {
             const caption = msg.message.imageMessage.caption || '';
             try {
-              const buffer = await downloadMediaMessage(msg, 'buffer', {}) as Buffer;
+              const buffer = (await downloadMediaMessage(
+                msg,
+                'buffer',
+                {},
+              )) as Buffer;
               const group = groups[chatJid];
               const groupDir = resolveGroupFolderPath(group.folder);
               const imagesDir = path.join(groupDir, 'images');
               fs.mkdirSync(imagesDir, { recursive: true });
-              const ext = (msg.message.imageMessage.mimetype || 'image/jpeg').split('/')[1] || 'jpg';
+              const ext =
+                (msg.message.imageMessage.mimetype || 'image/jpeg').split(
+                  '/',
+                )[1] || 'jpg';
               const filename = `${msg.key.id}.${ext}`;
               fs.writeFileSync(path.join(imagesDir, filename), buffer);
               content = `[Image: images/${filename}]${caption ? '\n' + caption : ''}`;
@@ -278,11 +321,19 @@ export class WhatsAppChannel implements Channel {
     const replyMode = this.pendingReplyMode.get(jid) ?? 'text';
     this.pendingReplyMode.delete(jid);
 
-    if (replyMode === 'voice' && process.env.MINIMAX_API_KEY && shouldUseTTS(text)) {
+    if (
+      replyMode === 'voice' &&
+      process.env.MINIMAX_API_KEY &&
+      shouldUseTTS(text)
+    ) {
       try {
         const start = Date.now();
         const audio = await synthesizeSpeech(text);
-        await this.sock.sendMessage(jid, { audio, mimetype: 'audio/ogg; codecs=opus', ptt: true });
+        await this.sock.sendMessage(jid, {
+          audio,
+          mimetype: 'audio/ogg; codecs=opus',
+          ptt: true,
+        });
         logger.info({ jid, duration: Date.now() - start }, 'Voice reply sent');
         return;
       } catch (err) {
@@ -292,7 +343,10 @@ export class WhatsAppChannel implements Channel {
 
     if (!this.connected) {
       this.outgoingQueue.push({ jid, text });
-      logger.info({ jid, length: text.length, queueSize: this.outgoingQueue.length }, 'WA disconnected, message queued');
+      logger.info(
+        { jid, length: text.length, queueSize: this.outgoingQueue.length },
+        'WA disconnected, message queued',
+      );
       return;
     }
     try {
@@ -301,7 +355,10 @@ export class WhatsAppChannel implements Channel {
     } catch (err) {
       // If send fails, queue it for retry on reconnect
       this.outgoingQueue.push({ jid, text });
-      logger.warn({ jid, err, queueSize: this.outgoingQueue.length }, 'Failed to send, message queued');
+      logger.warn(
+        { jid, err, queueSize: this.outgoingQueue.length },
+        'Failed to send, message queued',
+      );
     }
   }
 
@@ -319,8 +376,11 @@ export class WhatsAppChannel implements Channel {
   }
 
   async setTyping(jid: string, isTyping: boolean): Promise<void> {
-    this.sock.sendPresenceUpdate(isTyping ? 'composing' : 'paused', jid)
-      .catch((err) => logger.debug({ jid, err }, 'Failed to update typing status'));
+    this.sock
+      .sendPresenceUpdate(isTyping ? 'composing' : 'paused', jid)
+      .catch((err) =>
+        logger.debug({ jid, err }, 'Failed to update typing status'),
+      );
   }
 
   /**
@@ -374,7 +434,10 @@ export class WhatsAppChannel implements Channel {
     if (this.flushing || this.outgoingQueue.length === 0) return;
     this.flushing = true;
     try {
-      logger.info({ count: this.outgoingQueue.length }, 'Flushing outgoing message queue');
+      logger.info(
+        { count: this.outgoingQueue.length },
+        'Flushing outgoing message queue',
+      );
       while (this.outgoingQueue.length > 0) {
         const item = this.outgoingQueue.shift()!;
         await this.sendMessage(item.jid, item.text);

@@ -51,7 +51,8 @@ function parseQmdStatus(text: string): MemoryStatus {
   //   global (qmd://global/)
   //     Pattern:  **/*.md
   //     Files:    1 (updated 17m ago)
-  const collectionRegex = /^\s{2}(\w[\w-]*)\s+\(qmd:\/\/\w+\/\)\s*\n\s+Pattern:\s+.+\n\s+Files:\s+(\d+)/gm;
+  const collectionRegex =
+    /^\s{2}(\w[\w-]*)\s+\(qmd:\/\/\w+\/\)\s*\n\s+Pattern:\s+.+\n\s+Files:\s+(\d+)/gm;
   let match;
   while ((match = collectionRegex.exec(text)) !== null) {
     result.collections.push({
@@ -89,9 +90,11 @@ export function registerMemoryRoutes(app: FastifyInstance): void {
   app.get('/api/memory/search', async (req) => {
     const { q, mode = 'search' } = req.query as { q: string; mode?: string };
     if (!q) return { results: [], error: 'Missing query parameter "q"' };
-    if (q.length > 500) return { results: [], error: 'Query too long (max 500 chars)' };
+    if (q.length > 500)
+      return { results: [], error: 'Query too long (max 500 chars)' };
 
-    const cmd = mode === 'semantic' ? 'vsearch' : mode === 'hybrid' ? 'query' : 'search';
+    const cmd =
+      mode === 'semantic' ? 'vsearch' : mode === 'hybrid' ? 'query' : 'search';
     try {
       const result = execFileSync(getQmdBin(), [cmd, '--json', q], {
         timeout: 30000,

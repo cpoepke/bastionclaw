@@ -6,11 +6,14 @@ export async function transcribeAudio(buffer: Buffer): Promise<string> {
   form.append('file', new Blob([buffer], { type: 'audio/ogg' }), 'audio.ogg');
   form.append('model', 'whisper-large-v3-turbo');
 
-  const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: form,
-  });
+  const response = await fetch(
+    'https://api.groq.com/openai/v1/audio/transcriptions',
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+    },
+  );
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');

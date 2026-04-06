@@ -2,7 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import type { ServerDeps } from '../server.js';
 import { getAllSessions, deleteSession } from '../../db.js';
 
-export function registerSessionRoutes(app: FastifyInstance, deps: ServerDeps): void {
+export function registerSessionRoutes(
+  app: FastifyInstance,
+  deps: ServerDeps,
+): void {
   app.get('/api/sessions', async () => {
     const sessions = getAllSessions();
     const groups = deps.registeredGroups();
@@ -17,8 +20,11 @@ export function registerSessionRoutes(app: FastifyInstance, deps: ServerDeps): v
     });
   });
 
-  app.delete<{ Params: { folder: string } }>('/api/sessions/:folder', async (req) => {
-    deleteSession(req.params.folder);
-    return { ok: true };
-  });
+  app.delete<{ Params: { folder: string } }>(
+    '/api/sessions/:folder',
+    async (req) => {
+      deleteSession(req.params.folder);
+      return { ok: true };
+    },
+  );
 }

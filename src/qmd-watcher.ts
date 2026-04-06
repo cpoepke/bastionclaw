@@ -15,16 +15,24 @@ function runEmbed(qmd: string): void {
   embedRunning = true;
 
   // Clear both timers
-  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
-  if (maxDelayTimer) { clearTimeout(maxDelayTimer); maxDelayTimer = null; }
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+  if (maxDelayTimer) {
+    clearTimeout(maxDelayTimer);
+    maxDelayTimer = null;
+  }
 
   logger.info('qmd auto-update starting');
   // update discovers new/changed files, embed creates vectors
   execFile(qmd, ['update'], { timeout: 60000 }, (updateErr) => {
-    if (updateErr) logger.warn({ err: updateErr }, 'qmd update failed (non-fatal)');
+    if (updateErr)
+      logger.warn({ err: updateErr }, 'qmd update failed (non-fatal)');
     execFile(qmd, ['embed'], { timeout: 60000 }, (embedErr) => {
       embedRunning = false;
-      if (embedErr) logger.warn({ err: embedErr }, 'qmd auto-embed failed (non-fatal)');
+      if (embedErr)
+        logger.warn({ err: embedErr }, 'qmd auto-embed failed (non-fatal)');
       else logger.debug('qmd auto-update+embed complete');
     });
   });
@@ -37,8 +45,11 @@ function runEmbed(qmd: string): void {
 function ensureQmdCollections(qmd: string): void {
   try {
     const dirs = fs.readdirSync(GROUPS_DIR).filter((f) => {
-      try { return fs.statSync(`${GROUPS_DIR}/${f}`).isDirectory(); }
-      catch { return false; }
+      try {
+        return fs.statSync(`${GROUPS_DIR}/${f}`).isDirectory();
+      } catch {
+        return false;
+      }
     });
 
     for (const name of dirs) {
@@ -56,9 +67,17 @@ function ensureQmdCollections(qmd: string): void {
 
     // Run initial update + embed (non-blocking)
     execFile(qmd, ['update'], { timeout: 60000 }, (updateErr) => {
-      if (updateErr) logger.warn({ err: updateErr }, 'qmd initial update failed (non-fatal)');
+      if (updateErr)
+        logger.warn(
+          { err: updateErr },
+          'qmd initial update failed (non-fatal)',
+        );
       execFile(qmd, ['embed'], { timeout: 60000 }, (embedErr) => {
-        if (embedErr) logger.warn({ err: embedErr }, 'qmd initial embed failed (non-fatal)');
+        if (embedErr)
+          logger.warn(
+            { err: embedErr },
+            'qmd initial embed failed (non-fatal)',
+          );
         else logger.info('qmd initial update+embed complete');
       });
     });
@@ -74,20 +93,24 @@ export function startQmdWatcher(): void {
     // Ensure collections are registered and initially embedded
     ensureQmdCollections(qmd);
 
-    const watcher = fs.watch(GROUPS_DIR, { recursive: true }, (_event, filename) => {
-      if (!filename || !filename.endsWith('.md')) return;
-      if (filename.includes('/logs/')) return;
-      if (embedRunning) return;
+    const watcher = fs.watch(
+      GROUPS_DIR,
+      { recursive: true },
+      (_event, filename) => {
+        if (!filename || !filename.endsWith('.md')) return;
+        if (filename.includes('/logs/')) return;
+        if (embedRunning) return;
 
-      // Debounce: reset on each change
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => runEmbed(qmd), DEBOUNCE_MS);
+        // Debounce: reset on each change
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => runEmbed(qmd), DEBOUNCE_MS);
 
-      // Max delay: ensure embed fires within 60s of first change
-      if (!maxDelayTimer) {
-        maxDelayTimer = setTimeout(() => runEmbed(qmd), MAX_DELAY_MS);
-      }
-    });
+        // Max delay: ensure embed fires within 60s of first change
+        if (!maxDelayTimer) {
+          maxDelayTimer = setTimeout(() => runEmbed(qmd), MAX_DELAY_MS);
+        }
+      },
+    );
 
     watcher.on('error', (err) => {
       logger.warn({ err }, 'qmd file watcher error');

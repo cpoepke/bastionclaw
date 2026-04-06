@@ -30,38 +30,56 @@ export function registerInsightRoutes(app: FastifyInstance): void {
     const offset = parseInt(req.query.offset || '0', 10);
 
     if (req.query.search) {
-      const insights = searchInsightsKeyword(groupFolder, req.query.search, limit);
+      const insights = searchInsightsKeyword(
+        groupFolder,
+        req.query.search,
+        limit,
+      );
       return { insights, total: insights.length };
     }
 
-    return getTopInsights(groupFolder, limit, offset, req.query.category, sortBy);
+    return getTopInsights(
+      groupFolder,
+      limit,
+      offset,
+      req.query.category,
+      sortBy,
+    );
   });
 
   // Stats — must be before /:id to avoid matching "stats" as an ID
-  app.get<{ Querystring: { group?: string } }>('/api/insights/stats', async (req) => {
-    const groupFolder = req.query.group || 'main';
-    return getInsightStats(groupFolder);
-  });
+  app.get<{ Querystring: { group?: string } }>(
+    '/api/insights/stats',
+    async (req) => {
+      const groupFolder = req.query.group || 'main';
+      return getInsightStats(groupFolder);
+    },
+  );
 
   // Activity — source type breakdown, recent activity, pipeline log
-  app.get<{ Querystring: { group?: string } }>('/api/insights/activity', async (req) => {
-    const groupFolder = req.query.group || 'main';
-    const activity = getInsightActivity(groupFolder);
+  app.get<{ Querystring: { group?: string } }>(
+    '/api/insights/activity',
+    async (req) => {
+      const groupFolder = req.query.group || 'main';
+      const activity = getInsightActivity(groupFolder);
 
-    // Read pipeline log (last 50 lines)
-    let pipelineLog: string[] = [];
-    try {
-      const fs = await import('fs');
-      const logPath = '/tmp/refresh-insights.log';
-      if (fs.existsSync(logPath)) {
-        const content = fs.readFileSync(logPath, 'utf-8');
-        const lines = content.split('\n').filter(Boolean);
-        pipelineLog = lines.slice(-50);
+      // Read pipeline log (last 50 lines)
+      let pipelineLog: string[] = [];
+      try {
+        const fs = await import('fs');
+        const logPath = '/tmp/refresh-insights.log';
+        if (fs.existsSync(logPath)) {
+          const content = fs.readFileSync(logPath, 'utf-8');
+          const lines = content.split('\n').filter(Boolean);
+          pipelineLog = lines.slice(-50);
+        }
+      } catch {
+        /* ignore */
       }
-    } catch { /* ignore */ }
 
-    return { ...activity, pipelineLog };
-  });
+      return { ...activity, pipelineLog };
+    },
+  );
 
   // List all sources — must be before /:id
   app.get<{ Querystring: { limit?: string; offset?: string } }>(
@@ -74,36 +92,47 @@ export function registerInsightRoutes(app: FastifyInstance): void {
   );
 
   // Source with linked insights
-  app.get<{ Params: { id: string } }>('/api/insights/sources/:id', async (req, reply) => {
-    const source = getSourceByHash(req.params.id);
-    if (!source) return reply.status(404).send({ error: 'Source not found' });
-    const insights = getInsightsBySource(req.params.id);
-    return { ...source, insights };
-  });
+  app.get<{ Params: { id: string } }>(
+    '/api/insights/sources/:id',
+    async (req, reply) => {
+      const source = getSourceByHash(req.params.id);
+      if (!source) return reply.status(404).send({ error: 'Source not found' });
+      const insights = getInsightsBySource(req.params.id);
+      return { ...source, insights };
+    },
+  );
 
   // Single insight with sources
-  app.get<{ Params: { id: string } }>('/api/insights/:id', async (req, reply) => {
-    const insight = getInsightById(req.params.id);
-    if (!insight) return reply.status(404).send({ error: 'Insight not found' });
-    return insight;
-  });
-
-  // Delete insight
-  app.delete<{ Params: { id: string } }>('/api/insights/:id', async (req, reply) => {
-    const insight = getInsightById(req.params.id);
-    if (!insight) return reply.status(404).send({ error: 'Insight not found' });
-    deleteInsight(req.params.id);
-    return { ok: true };
-  });
-
-  // Update insight
-  app.patch<{ Params: { id: string }; Body: { text?: string; category?: string } }>(
+  app.get<{ Params: { id: string } }>(
     '/api/insights/:id',
     async (req, reply) => {
       const insight = getInsightById(req.params.id);
-      if (!insight) return reply.status(404).send({ error: 'Insight not found' });
-      updateInsightFields(req.params.id, req.body);
+      if (!insight)
+        return reply.status(404).send({ error: 'Insight not found' });
+      return insight;
+    },
+  );
+
+  // Delete insight
+  app.delete<{ Params: { id: string } }>(
+    '/api/insights/:id',
+    async (req, reply) => {
+      const insight = getInsightById(req.params.id);
+      if (!insight)
+        return reply.status(404).send({ error: 'Insight not found' });
+      deleteInsight(req.params.id);
       return { ok: true };
     },
   );
+
+  // Update insight
+  app.patch<{
+    Params: { id: string };
+    Body: { text?: string; category?: string };
+  }>('/api/insights/:id', async (req, reply) => {
+    const insight = getInsightById(req.params.id);
+    if (!insight) return reply.status(404).send({ error: 'Insight not found' });
+    updateInsightFields(req.params.id, req.body);
+    return { ok: true };
+  });
 }

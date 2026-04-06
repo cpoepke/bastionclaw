@@ -3,7 +3,10 @@ import type { ServerDeps } from '../server.js';
 import { getDbStats } from '../../db.js';
 import * as config from '../../config.js';
 
-export function registerDebugRoutes(app: FastifyInstance, deps: ServerDeps): void {
+export function registerDebugRoutes(
+  app: FastifyInstance,
+  deps: ServerDeps,
+): void {
   app.get('/api/debug', async () => {
     return {
       queue: deps.queue.getState(),

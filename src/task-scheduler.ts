@@ -11,7 +11,11 @@ import {
   TIMEZONE,
 } from './config.js';
 import { isValidGroupFolder } from './group-folder.js';
-import { ContainerOutput, runContainerAgent, writeTasksSnapshot } from './container-runner.js';
+import {
+  ContainerOutput,
+  runContainerAgent,
+  writeTasksSnapshot,
+} from './container-runner.js';
 import {
   getAllTasks,
   getDueTasks,
@@ -29,7 +33,12 @@ export interface SchedulerDependencies {
   registeredGroups: () => Record<string, RegisteredGroup>;
   getSessions: () => Record<string, string>;
   queue: GroupQueue;
-  onProcess: (groupJid: string, proc: ChildProcess, containerName: string, groupFolder: string) => void;
+  onProcess: (
+    groupJid: string,
+    proc: ChildProcess,
+    containerName: string,
+    groupFolder: string,
+  ) => void;
   sendMessage: (jid: string, text: string) => Promise<void>;
 }
 
@@ -120,7 +129,10 @@ async function runTask(
   const resetIdleTimer = () => {
     if (idleTimer) clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
-      logger.debug({ taskId: task.id }, 'Scheduled task idle timeout, closing container stdin');
+      logger.debug(
+        { taskId: task.id },
+        'Scheduled task idle timeout, closing container stdin',
+      );
       deps.queue.closeStdin(task.chat_jid);
     }, TASK_CLOSE_DELAY_MS);
   };
@@ -128,7 +140,14 @@ async function runTask(
   // Sanitize scheduled task prompt
   const promptCheck = sanitizePrompt(task.prompt);
   if (!promptCheck.safe) {
-    logger.warn({ taskId: task.id, reason: promptCheck.reason, blocked: promptCheck.blocked }, 'Prompt injection detected in scheduled task');
+    logger.warn(
+      {
+        taskId: task.id,
+        reason: promptCheck.reason,
+        blocked: promptCheck.blocked,
+      },
+      'Prompt injection detected in scheduled task',
+    );
   }
   if (promptCheck.blocked) {
     const blockError = `Task prompt blocked: ${promptCheck.reason}`;
@@ -140,7 +159,10 @@ async function runTask(
       result: null,
       error: blockError,
     });
-    await deps.sendMessage(task.chat_jid, `⚠️ Scheduled task "${task.id}" blocked: ${promptCheck.reason}`);
+    await deps.sendMessage(
+      task.chat_jid,
+      `⚠️ Scheduled task "${task.id}" blocked: ${promptCheck.reason}`,
+    );
     return;
   }
   const sanitizedPrompt = promptCheck.sanitized;
@@ -157,7 +179,8 @@ async function runTask(
         isScheduledTask: true,
         assistantName: ASSISTANT_NAME,
       },
-      (proc, containerName) => deps.onProcess(task.chat_jid, proc, containerName, task.group_folder),
+      (proc, containerName) =>
+        deps.onProcess(task.chat_jid, proc, containerName, task.group_folder),
       async (streamedOutput: ContainerOutput) => {
         if (streamedOutput.result) {
           result = streamedOutput.result;
@@ -167,7 +190,10 @@ async function runTask(
           resetIdleTimer();
         } else if (streamedOutput.status !== 'error') {
           // Null result = agent query/turn completed
-          logger.info({ group: group.name, taskId: task.id }, 'Agent query completed');
+          logger.info(
+            { group: group.name, taskId: task.id },
+            'Agent query completed',
+          );
           deps.queue.notifyIdle(task.chat_jid);
         }
         if (streamedOutput.status === 'error') {
@@ -198,9 +224,15 @@ async function runTask(
   // Notify the user if the task failed (e.g. OOM, crash)
   if (error && !result) {
     try {
-      await deps.sendMessage(task.chat_jid, `⚠️ Task failed: ${error.slice(0, 200)}`);
+      await deps.sendMessage(
+        task.chat_jid,
+        `⚠️ Task failed: ${error.slice(0, 200)}`,
+      );
     } catch (notifyErr) {
-      logger.warn({ taskId: task.id, err: notifyErr }, 'Failed to send task error notification');
+      logger.warn(
+        { taskId: task.id, err: notifyErr },
+        'Failed to send task error notification',
+      );
     }
   }
 
@@ -216,7 +248,10 @@ async function runTask(
       error,
     });
   } catch (logErr) {
-    logger.warn({ taskId: task.id, err: logErr }, 'Failed to log task run (non-fatal)');
+    logger.warn(
+      { taskId: task.id, err: logErr },
+      'Failed to log task run (non-fatal)',
+    );
   }
 
   let nextRun: string | null = null;
@@ -268,10 +303,8 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
         // For recurring tasks, next_run is recalculated after completion.
         updateTask(currentTask.id, { next_run: null });
 
-        deps.queue.enqueueTask(
-          currentTask.chat_jid,
-          currentTask.id,
-          () => runTask(currentTask, deps),
+        deps.queue.enqueueTask(currentTask.chat_jid, currentTask.id, () =>
+          runTask(currentTask, deps),
         );
       }
     } catch (err) {

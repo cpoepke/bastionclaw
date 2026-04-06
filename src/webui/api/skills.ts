@@ -5,7 +5,10 @@ import type { SkillInfo } from '../types.js';
 
 const SKILLS_DIR = path.resolve(process.cwd(), 'container', 'skills');
 
-function parseSkillMd(content: string): { description: string; allowedTools: string[] } {
+function parseSkillMd(content: string): {
+  description: string;
+  allowedTools: string[];
+} {
   let description = '';
   const allowedTools: string[] = [];
   const lines = content.split('\n');
@@ -27,7 +30,12 @@ function parseSkillMd(content: string): { description: string; allowedTools: str
         const [, key, value] = match;
         if (key === 'description') description = value.trim();
         if (key === 'allowed-tools' || key === 'allowed_tools') {
-          allowedTools.push(...value.split(',').map((t) => t.trim()).filter(Boolean));
+          allowedTools.push(
+            ...value
+              .split(',')
+              .map((t) => t.trim())
+              .filter(Boolean),
+          );
         }
       }
     }
@@ -74,42 +82,55 @@ export function registerSkillRoutes(app: FastifyInstance): void {
     return getSkills();
   });
 
-  app.get<{ Params: { name: string } }>('/api/skills/:name', async (req, reply) => {
-    const skills = getSkills();
-    const skill = skills.find((s) => s.name === req.params.name);
-    if (!skill) return reply.status(404).send({ error: 'Skill not found' });
-    return skill;
-  });
+  app.get<{ Params: { name: string } }>(
+    '/api/skills/:name',
+    async (req, reply) => {
+      const skills = getSkills();
+      const skill = skills.find((s) => s.name === req.params.name);
+      if (!skill) return reply.status(404).send({ error: 'Skill not found' });
+      return skill;
+    },
+  );
 
-  app.post<{ Params: { name: string } }>('/api/skills/:name/toggle', async (req, reply) => {
-    const skillDir = path.join(SKILLS_DIR, req.params.name);
-    if (!fs.existsSync(skillDir)) return reply.status(404).send({ error: 'Skill not found' });
+  app.post<{ Params: { name: string } }>(
+    '/api/skills/:name/toggle',
+    async (req, reply) => {
+      const skillDir = path.join(SKILLS_DIR, req.params.name);
+      if (!fs.existsSync(skillDir))
+        return reply.status(404).send({ error: 'Skill not found' });
 
-    const disabledPath = path.join(skillDir, '.disabled');
-    if (fs.existsSync(disabledPath)) {
-      fs.unlinkSync(disabledPath);
-      return { enabled: true };
-    } else {
-      fs.writeFileSync(disabledPath, '');
-      return { enabled: false };
-    }
-  });
+      const disabledPath = path.join(skillDir, '.disabled');
+      if (fs.existsSync(disabledPath)) {
+        fs.unlinkSync(disabledPath);
+        return { enabled: true };
+      } else {
+        fs.writeFileSync(disabledPath, '');
+        return { enabled: false };
+      }
+    },
+  );
 
   // Create a new skill
-  app.post<{ Body: { name: string; content: string } }>('/api/skills', async (req, reply) => {
-    const { name, content } = req.body || {};
-    if (!name || !content) return reply.status(400).send({ error: 'name and content required' });
+  app.post<{ Body: { name: string; content: string } }>(
+    '/api/skills',
+    async (req, reply) => {
+      const { name, content } = req.body || {};
+      if (!name || !content)
+        return reply.status(400).send({ error: 'name and content required' });
 
-    const safeName = name.replace(/[^a-zA-Z0-9_-]/g, '');
-    if (!safeName) return reply.status(400).send({ error: 'Invalid skill name' });
+      const safeName = name.replace(/[^a-zA-Z0-9_-]/g, '');
+      if (!safeName)
+        return reply.status(400).send({ error: 'Invalid skill name' });
 
-    const skillDir = path.join(SKILLS_DIR, safeName);
-    if (fs.existsSync(skillDir)) return reply.status(409).send({ error: 'Skill already exists' });
+      const skillDir = path.join(SKILLS_DIR, safeName);
+      if (fs.existsSync(skillDir))
+        return reply.status(409).send({ error: 'Skill already exists' });
 
-    fs.mkdirSync(skillDir, { recursive: true });
-    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
-    return { ok: true, name: safeName };
-  });
+      fs.mkdirSync(skillDir, { recursive: true });
+      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
+      return { ok: true, name: safeName };
+    },
+  );
 
   // Update skill content
   app.put<{ Params: { name: string }; Body: { content: string } }>(
@@ -117,10 +138,12 @@ export function registerSkillRoutes(app: FastifyInstance): void {
     async (req, reply) => {
       const skillDir = path.join(SKILLS_DIR, req.params.name);
       const skillMd = path.join(skillDir, 'SKILL.md');
-      if (!fs.existsSync(skillMd)) return reply.status(404).send({ error: 'Skill not found' });
+      if (!fs.existsSync(skillMd))
+        return reply.status(404).send({ error: 'Skill not found' });
 
       const { content } = req.body || {};
-      if (!content) return reply.status(400).send({ error: 'content required' });
+      if (!content)
+        return reply.status(400).send({ error: 'content required' });
 
       fs.writeFileSync(skillMd, content);
       return { ok: true };
@@ -128,11 +151,15 @@ export function registerSkillRoutes(app: FastifyInstance): void {
   );
 
   // Delete a skill
-  app.delete<{ Params: { name: string } }>('/api/skills/:name', async (req, reply) => {
-    const skillDir = path.join(SKILLS_DIR, req.params.name);
-    if (!fs.existsSync(skillDir)) return reply.status(404).send({ error: 'Skill not found' });
+  app.delete<{ Params: { name: string } }>(
+    '/api/skills/:name',
+    async (req, reply) => {
+      const skillDir = path.join(SKILLS_DIR, req.params.name);
+      if (!fs.existsSync(skillDir))
+        return reply.status(404).send({ error: 'Skill not found' });
 
-    fs.rmSync(skillDir, { recursive: true, force: true });
-    return { ok: true };
-  });
+      fs.rmSync(skillDir, { recursive: true, force: true });
+      return { ok: true };
+    },
+  );
 }

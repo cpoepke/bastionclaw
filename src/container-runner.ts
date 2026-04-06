@@ -130,19 +130,26 @@ function buildVolumeMounts(
   fs.mkdirSync(groupSessionsDir, { recursive: true });
   const settingsFile = path.join(groupSessionsDir, 'settings.json');
   if (!fs.existsSync(settingsFile)) {
-    fs.writeFileSync(settingsFile, JSON.stringify({
-      env: {
-        // Enable agent swarms (subagent orchestration)
-        // https://code.claude.com/docs/en/agent-teams#orchestrate-teams-of-claude-code-sessions
-        CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-        // Load CLAUDE.md from additional mounted directories
-        // https://code.claude.com/docs/en/memory#load-memory-from-additional-directories
-        CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
-        // Enable Claude's memory feature (persists user preferences between sessions)
-        // https://code.claude.com/docs/en/memory#manage-auto-memory
-        CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
-      },
-    }, null, 2) + '\n');
+    fs.writeFileSync(
+      settingsFile,
+      JSON.stringify(
+        {
+          env: {
+            // Enable agent swarms (subagent orchestration)
+            // https://code.claude.com/docs/en/agent-teams#orchestrate-teams-of-claude-code-sessions
+            CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
+            // Load CLAUDE.md from additional mounted directories
+            // https://code.claude.com/docs/en/memory#load-memory-from-additional-directories
+            CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
+            // Enable Claude's memory feature (persists user preferences between sessions)
+            // https://code.claude.com/docs/en/memory#manage-auto-memory
+            CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
+          },
+        },
+        null,
+        2,
+      ) + '\n',
+    );
   }
 
   // Sync skills from container/skills/ into each group's .claude/skills/
@@ -178,7 +185,12 @@ function buildVolumeMounts(
 
   // Mount agent-runner source from host — recompiled on container startup.
   // Bypasses Apple Container's sticky build cache for code changes.
-  const agentRunnerSrc = path.join(projectRoot, 'container', 'agent-runner', 'src');
+  const agentRunnerSrc = path.join(
+    projectRoot,
+    'container',
+    'agent-runner',
+    'src',
+  );
   mounts.push({
     hostPath: agentRunnerSrc,
     containerPath: '/app/src',
@@ -211,7 +223,14 @@ function readSecrets(): Record<string, string> {
   if (!fs.existsSync(envFile)) return {};
 
   // SDK auth + API keys needed by agent Bash tool calls
-  const allowedVars = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'TRANSCRIPT_API_KEY', 'GEMINI_API_KEY', 'PAPERCLIP_API_KEY', 'PAPERCLIP_API_URL'];
+  const allowedVars = [
+    'CLAUDE_CODE_OAUTH_TOKEN',
+    'ANTHROPIC_API_KEY',
+    'TRANSCRIPT_API_KEY',
+    'GEMINI_API_KEY',
+    'PAPERCLIP_API_KEY',
+    'PAPERCLIP_API_URL',
+  ];
   const secrets: Record<string, string> = {};
   const content = fs.readFileSync(envFile, 'utf-8');
 
@@ -235,7 +254,10 @@ function readSecrets(): Record<string, string> {
   return secrets;
 }
 
-function buildContainerArgs(mounts: VolumeMount[], containerName: string): string[] {
+function buildContainerArgs(
+  mounts: VolumeMount[],
+  containerName: string,
+): string[] {
   const runtime = getContainerRuntime();
   const args: string[] = ['run', '-i', '--rm', '--name', containerName];
 
@@ -342,8 +364,16 @@ export async function runContainerAgent(
 
     // Symlink for convenience: groups/{folder}/logs/latest.log → this file
     const latestLink = path.join(logsDir, 'latest.log');
-    try { fs.unlinkSync(latestLink); } catch { /* ignore */ }
-    try { fs.symlinkSync(path.basename(logFile), latestLink); } catch { /* ignore */ }
+    try {
+      fs.unlinkSync(latestLink);
+    } catch {
+      /* ignore */
+    }
+    try {
+      fs.symlinkSync(path.basename(logFile), latestLink);
+    } catch {
+      /* ignore */
+    }
 
     onProcess(container, containerName);
 
@@ -369,7 +399,11 @@ export async function runContainerAgent(
 
       // Write non-marker lines to live log (skip raw JSON output markers)
       for (const line of chunk.split('\n')) {
-        if (line && !line.includes('BASTIONCLAW_OUTPUT') && !line.startsWith('{')) {
+        if (
+          line &&
+          !line.includes('BASTIONCLAW_OUTPUT') &&
+          !line.startsWith('{')
+        ) {
           logStream.write(`[stdout] ${line}\n`);
         }
       }
@@ -455,13 +489,24 @@ export async function runContainerAgent(
 
     const killOnTimeout = () => {
       timedOut = true;
-      logger.error({ group: group.name, containerName }, 'Container timeout, stopping gracefully');
-      execFile(getContainerRuntime(), ['stop', containerName], { timeout: 15000 }, (err) => {
-        if (err) {
-          logger.warn({ group: group.name, containerName, err }, 'Graceful stop failed, force killing');
-          container.kill('SIGKILL');
-        }
-      });
+      logger.error(
+        { group: group.name, containerName },
+        'Container timeout, stopping gracefully',
+      );
+      execFile(
+        getContainerRuntime(),
+        ['stop', containerName],
+        { timeout: 15000 },
+        (err) => {
+          if (err) {
+            logger.warn(
+              { group: group.name, containerName, err },
+              'Graceful stop failed, force killing',
+            );
+            container.kill('SIGKILL');
+          }
+        },
+      );
     };
 
     let timeout = setTimeout(killOnTimeout, timeoutMs);
@@ -514,7 +559,8 @@ export async function runContainerAgent(
         return;
       }
 
-      const isVerbose = process.env.LOG_LEVEL === 'debug' || process.env.LOG_LEVEL === 'trace';
+      const isVerbose =
+        process.env.LOG_LEVEL === 'debug' || process.env.LOG_LEVEL === 'trace';
       const isError = code !== 0;
 
       // Append completion summary to live log
@@ -526,7 +572,9 @@ export async function runContainerAgent(
 
       if (isVerbose || isError) {
         logStream.write(`\n=== Input ===\n${JSON.stringify(input, null, 2)}\n`);
-        logStream.write(`\n=== Container Args ===\n${containerArgs.join(' ')}\n`);
+        logStream.write(
+          `\n=== Container Args ===\n${containerArgs.join(' ')}\n`,
+        );
       }
       logStream.end();
       logger.debug({ logFile, verbose: isVerbose }, 'Container log written');
@@ -627,7 +675,10 @@ export async function runContainerAgent(
 
     container.on('error', (err) => {
       clearTimeout(timeout);
-      logger.error({ group: group.name, containerName, error: err }, 'Container spawn error');
+      logger.error(
+        { group: group.name, containerName, error: err },
+        'Container spawn error',
+      );
       resolve({
         status: 'error',
         result: null,

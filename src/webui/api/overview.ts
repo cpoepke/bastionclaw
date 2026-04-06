@@ -2,7 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import type { ServerDeps } from '../server.js';
 import { getAllTasks, getDbStats } from '../../db.js';
 
-export function registerOverviewRoutes(app: FastifyInstance, deps: ServerDeps): void {
+export function registerOverviewRoutes(
+  app: FastifyInstance,
+  deps: ServerDeps,
+): void {
   app.get('/api/overview', async () => {
     const tasks = getAllTasks();
     const queueState = deps.queue.getState();

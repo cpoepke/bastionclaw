@@ -1,4 +1,9 @@
-import type { RegisteredGroup, ScheduledTask, TaskRunLog, NewMessage } from '../types.js';
+import type {
+  RegisteredGroup,
+  ScheduledTask,
+  TaskRunLog,
+  NewMessage,
+} from '../types.js';
 
 export interface OverviewResponse {
   uptime: number;
@@ -57,7 +62,10 @@ export interface SkillInfo {
 }
 
 export interface ConfigResponse {
-  values: Record<string, { value: string | number | boolean; env: string; description: string }>;
+  values: Record<
+    string,
+    { value: string | number | boolean; env: string; description: string }
+  >;
 }
 
 export interface DebugResponse {

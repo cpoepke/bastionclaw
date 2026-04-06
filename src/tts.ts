@@ -18,8 +18,18 @@ export async function synthesizeSpeech(text: string): Promise<Buffer> {
       model: 'speech-02-turbo',
       text,
       stream: false,
-      voice_setting: { voice_id: 'Podcast_male_en', speed: 1.0, vol: 1.0, pitch: 0 },
-      audio_setting: { sample_rate: 24000, bitrate: 128000, format: 'mp3', channel: 1 },
+      voice_setting: {
+        voice_id: 'Podcast_male_en',
+        speed: 1.0,
+        vol: 1.0,
+        pitch: 0,
+      },
+      audio_setting: {
+        sample_rate: 24000,
+        bitrate: 128000,
+        format: 'mp3',
+        channel: 1,
+      },
     }),
   });
 
@@ -44,10 +54,14 @@ export async function synthesizeSpeech(text: string): Promise<Buffer> {
 function convertToOggOpus(input: Buffer): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const ff = spawn('ffmpeg', [
-      '-i', 'pipe:0',
-      '-c:a', 'libopus',
-      '-b:a', '32k',
-      '-f', 'ogg',
+      '-i',
+      'pipe:0',
+      '-c:a',
+      'libopus',
+      '-b:a',
+      '32k',
+      '-f',
+      'ogg',
       'pipe:1',
     ]);
 
