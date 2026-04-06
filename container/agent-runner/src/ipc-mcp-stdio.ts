@@ -42,7 +42,7 @@ const server = new McpServer({
 
 server.tool(
   'send_message',
-  "Send a message to the user or group immediately while you're still running. Use this for progress updates or to send multiple messages. You can call this multiple times. Note: when running as a scheduled task, your final output is NOT sent to the user — use this tool if you need to communicate with the user or group.",
+  "Send a message to the user or group. IMPORTANT: Do NOT use this for your regular reply — your final text output is automatically delivered to the user. Only use this tool for: (1) scheduled tasks where final output is NOT auto-sent, (2) interim progress updates during long-running tasks, or (3) sending multiple separate messages in one turn. Using this for a normal reply causes the message to be sent twice.",
   {
     text: z.string().describe('The message text to send'),
     sender: z.string().optional().describe('Your role/identity name (e.g. "Researcher"). When set, messages appear from a dedicated bot in Telegram.'),
