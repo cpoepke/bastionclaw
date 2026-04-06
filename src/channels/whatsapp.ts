@@ -35,6 +35,32 @@ function shouldUseTTS(text: string): boolean {
   return true;
 }
 
+/**
+ * Detect if the user explicitly requests a specific response mode.
+ * Checked on the incoming message content (transcript for voice, text for text messages).
+ * Returns null if no explicit preference is found → fall back to channel default.
+ */
+function detectResponseModeOverride(text: string): 'voice' | 'text' | null {
+  const t = text.toLowerCase();
+
+  // Explicit voice request (English + German)
+  if (
+    /\b(reply|respond|answer|antworte?)\s+(with|via|in|als|mit)\s+voice\b/.test(t) ||
+    /\b(voice\s+(reply|note\s+back|back)|sprich\s+zurück|sprachnachricht\s+zurück)\b/.test(t) ||
+    /\bantworte?\s+(als\s+)?sprachnachricht\b/.test(t) ||
+    /\bschick\s+(eine\s+)?sprachnachricht\b/.test(t)
+  ) return 'voice';
+
+  // Explicit text request (English + German)
+  if (
+    /\b(reply|respond|answer|antworte?)\s+(in|with|via|als|per|mit)\s+text\b/.test(t) ||
+    /\b(text\s+reply|text\s+back|write\s+(it\s+)?back|type\s+(your\s+)?answer)\b/.test(t) ||
+    /\b(textantwort|schreib\s+zurück|antworte?\s+schriftlich|antworte?\s+per\s+text)\b/.test(t)
+  ) return 'text';
+
+  return null;
+}
+
 export interface WhatsAppChannelOpts {
   onMessage: OnInboundMessage;
   onChatMetadata: OnChatMetadata;
@@ -51,7 +77,9 @@ export class WhatsAppChannel implements Channel {
   private outgoingQueue: Array<{ jid: string; text: string }> = [];
   private flushing = false;
   private groupSyncTimerStarted = false;
-  private pendingVoiceJids = new Set<string>();
+  // Stores the resolved reply mode per JID: 'voice' | 'text'.
+  // Set on each inbound message; cleared after the reply is sent.
+  private pendingReplyMode = new Map<string, 'voice' | 'text'>();
 
   private opts: WhatsAppChannelOpts;
 
@@ -191,8 +219,10 @@ export class WhatsAppChannel implements Channel {
               const buffer = await downloadMediaMessage(msg, 'buffer', {}) as Buffer;
               const transcript = await transcribeAudio(buffer);
               content = '[Voice] ' + transcript;
-              this.pendingVoiceJids.add(chatJid);
-              logger.info({ duration: Date.now() - start }, 'Voice message transcribed');
+              // Detect explicit override in the transcript; default for PTT is voice
+              const override = detectResponseModeOverride(transcript);
+              this.pendingReplyMode.set(chatJid, override ?? 'voice');
+              logger.info({ duration: Date.now() - start, replyMode: override ?? 'voice' }, 'Voice message transcribed');
             } catch (err) {
               logger.warn({ err }, 'Voice transcription failed');
               content = '[Voice message - transcription failed]';
@@ -218,6 +248,15 @@ export class WhatsAppChannel implements Channel {
             }
           }
 
+          // For text messages: check if user explicitly requests voice reply.
+          // (PTT voice notes already resolve pendingReplyMode in the block above.)
+          if (!msg.message?.audioMessage?.ptt) {
+            const override = detectResponseModeOverride(content);
+            if (override === 'voice') {
+              this.pendingReplyMode.set(chatJid, 'voice');
+            }
+          }
+
           const sender = msg.key.participant || msg.key.remoteJid || '';
           const senderName = msg.pushName || sender.split('@')[0];
 
@@ -236,9 +275,10 @@ export class WhatsAppChannel implements Channel {
   }
 
   async sendMessage(jid: string, text: string): Promise<void> {
-    const useVoice = this.pendingVoiceJids.delete(jid); // atomically clear the flag
+    const replyMode = this.pendingReplyMode.get(jid) ?? 'text';
+    this.pendingReplyMode.delete(jid);
 
-    if (useVoice && process.env.MINIMAX_API_KEY && shouldUseTTS(text)) {
+    if (replyMode === 'voice' && process.env.MINIMAX_API_KEY && shouldUseTTS(text)) {
       try {
         const start = Date.now();
         const audio = await synthesizeSpeech(text);

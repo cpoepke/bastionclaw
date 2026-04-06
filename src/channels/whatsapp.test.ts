@@ -673,7 +673,7 @@ describe('WhatsAppChannel', () => {
       );
     });
 
-    it('sends voice reply when MINIMAX_API_KEY is set after voice message', async () => {
+    it('sends voice reply (default) when MINIMAX_API_KEY is set after PTT voice message', async () => {
       process.env.GROQ_API_KEY = 'test-groq-key';
       process.env.MINIMAX_API_KEY = 'test-minimax-key';
 
@@ -697,7 +697,6 @@ describe('WhatsAppChannel', () => {
 
       await new Promise((r) => setTimeout(r, 50));
 
-      // Now reply — should use TTS
       await channel.sendMessage('registered@g.us', 'It is 3pm.');
 
       expect(synthesizeSpeech).toHaveBeenCalledWith('It is 3pm.');
@@ -707,6 +706,70 @@ describe('WhatsAppChannel', () => {
       );
 
       delete process.env.GROQ_API_KEY;
+      delete process.env.MINIMAX_API_KEY;
+    });
+
+    it('sends text reply when PTT voice message contains explicit text override', async () => {
+      process.env.GROQ_API_KEY = 'test-groq-key';
+      process.env.MINIMAX_API_KEY = 'test-minimax-key';
+
+      vi.mocked(downloadMediaMessage).mockResolvedValue(Buffer.from('fake-audio') as any);
+      vi.mocked(transcribeAudio).mockResolvedValue('What time is it? Answer in text please.');
+
+      const opts = createTestOpts();
+      const channel = new WhatsAppChannel(opts);
+
+      await connectChannel(channel);
+
+      triggerMessages([
+        {
+          key: { id: 'voice-text-override', remoteJid: 'registered@g.us', participant: '5551234@s.whatsapp.net', fromMe: false },
+          message: { audioMessage: { mimetype: 'audio/ogg; codecs=opus', ptt: true } },
+          pushName: 'Jack',
+          messageTimestamp: Math.floor(Date.now() / 1000),
+        },
+      ]);
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      await channel.sendMessage('registered@g.us', 'It is 3pm.');
+
+      expect(synthesizeSpeech).not.toHaveBeenCalled();
+      expect(fakeSocket.sendMessage).toHaveBeenCalledWith('registered@g.us', { text: 'It is 3pm.' });
+
+      delete process.env.GROQ_API_KEY;
+      delete process.env.MINIMAX_API_KEY;
+    });
+
+    it('sends voice reply when text message contains explicit voice override', async () => {
+      process.env.MINIMAX_API_KEY = 'test-minimax-key';
+
+      vi.mocked(synthesizeSpeech).mockResolvedValue(Buffer.from('fake-ogg') as any);
+
+      const opts = createTestOpts();
+      const channel = new WhatsAppChannel(opts);
+
+      await connectChannel(channel);
+
+      triggerMessages([
+        {
+          key: { id: 'text-voice-override', remoteJid: 'registered@g.us', participant: '5551234@s.whatsapp.net', fromMe: false },
+          message: { conversation: 'What is the weather? Reply with voice.' },
+          pushName: 'Jack',
+          messageTimestamp: Math.floor(Date.now() / 1000),
+        },
+      ]);
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      await channel.sendMessage('registered@g.us', 'It is sunny.');
+
+      expect(synthesizeSpeech).toHaveBeenCalledWith('It is sunny.');
+      expect(fakeSocket.sendMessage).toHaveBeenCalledWith(
+        'registered@g.us',
+        expect.objectContaining({ mimetype: 'audio/ogg; codecs=opus', ptt: true }),
+      );
+
       delete process.env.MINIMAX_API_KEY;
     });
 
