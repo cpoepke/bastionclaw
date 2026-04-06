@@ -34,9 +34,20 @@ vi.mock('fs', async () => {
       ...actual,
       existsSync: vi.fn(() => true),
       mkdirSync: vi.fn(),
+      writeFileSync: vi.fn(),
     },
   };
 });
+
+// Mock group-folder
+vi.mock('../group-folder.js', () => ({
+  resolveGroupFolderPath: vi.fn(() => '/tmp/bastionclaw-test-groups/test-group'),
+}));
+
+// Mock tts module
+vi.mock('../tts.js', () => ({
+  synthesizeSpeech: vi.fn(),
+}));
 
 // Mock child_process (used for osascript notification)
 vi.mock('child_process', () => ({
@@ -106,6 +117,9 @@ import { WhatsAppChannel, WhatsAppChannelOpts } from './whatsapp.js';
 import { getLastGroupSync, updateChatName, setLastGroupSync } from '../db.js';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import { transcribeAudio } from '../transcribe.js';
+import { synthesizeSpeech } from '../tts.js';
+import { resolveGroupFolderPath } from '../group-folder.js';
+import fs from 'fs';
 
 // --- Test helpers ---
 
@@ -147,6 +161,7 @@ function triggerMessages(messages: unknown[]) {
 describe('WhatsAppChannel', () => {
   beforeEach(() => {
     fakeSocket = createFakeSocket();
+    vi.clearAllMocks();
     vi.mocked(getLastGroupSync).mockReturnValue(null);
   });
 
@@ -436,7 +451,9 @@ describe('WhatsAppChannel', () => {
       );
     });
 
-    it('extracts caption from imageMessage', async () => {
+    it('downloads image and includes path + caption when imageMessage received', async () => {
+      vi.mocked(downloadMediaMessage).mockResolvedValue(Buffer.from('fake-image') as any);
+
       const opts = createTestOpts();
       const channel = new WhatsAppChannel(opts);
 
@@ -458,9 +475,15 @@ describe('WhatsAppChannel', () => {
         },
       ]);
 
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        '/tmp/bastionclaw-test-groups/test-group/images/msg-6.jpeg',
+        expect.any(Buffer),
+      );
       expect(opts.onMessage).toHaveBeenCalledWith(
         'registered@g.us',
-        expect.objectContaining({ content: 'Check this photo' }),
+        expect.objectContaining({ content: '[Image: images/msg-6.jpeg]\nCheck this photo' }),
       );
     });
 
@@ -598,6 +621,195 @@ describe('WhatsAppChannel', () => {
       );
 
       delete process.env.GROQ_API_KEY;
+    });
+
+    it('downloads image without caption', async () => {
+      vi.mocked(downloadMediaMessage).mockResolvedValue(Buffer.from('fake-image') as any);
+
+      const opts = createTestOpts();
+      const channel = new WhatsAppChannel(opts);
+
+      await connectChannel(channel);
+
+      triggerMessages([
+        {
+          key: { id: 'img-no-caption', remoteJid: 'registered@g.us', participant: '5551234@s.whatsapp.net', fromMe: false },
+          message: { imageMessage: { mimetype: 'image/png' } },
+          pushName: 'Henry',
+          messageTimestamp: Math.floor(Date.now() / 1000),
+        },
+      ]);
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(opts.onMessage).toHaveBeenCalledWith(
+        'registered@g.us',
+        expect.objectContaining({ content: '[Image: images/img-no-caption.png]' }),
+      );
+    });
+
+    it('falls back to caption when image download fails', async () => {
+      vi.mocked(downloadMediaMessage).mockRejectedValue(new Error('Download error'));
+
+      const opts = createTestOpts();
+      const channel = new WhatsAppChannel(opts);
+
+      await connectChannel(channel);
+
+      triggerMessages([
+        {
+          key: { id: 'img-fail', remoteJid: 'registered@g.us', participant: '5551234@s.whatsapp.net', fromMe: false },
+          message: { imageMessage: { caption: 'Fallback caption', mimetype: 'image/jpeg' } },
+          pushName: 'Irene',
+          messageTimestamp: Math.floor(Date.now() / 1000),
+        },
+      ]);
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(opts.onMessage).toHaveBeenCalledWith(
+        'registered@g.us',
+        expect.objectContaining({ content: 'Fallback caption' }),
+      );
+    });
+
+    it('sends voice reply when MINIMAX_API_KEY is set after voice message', async () => {
+      process.env.GROQ_API_KEY = 'test-groq-key';
+      process.env.MINIMAX_API_KEY = 'test-minimax-key';
+
+      vi.mocked(downloadMediaMessage).mockResolvedValue(Buffer.from('fake-audio') as any);
+      vi.mocked(transcribeAudio).mockResolvedValue('What time is it?');
+      vi.mocked(synthesizeSpeech).mockResolvedValue(Buffer.from('fake-ogg') as any);
+
+      const opts = createTestOpts();
+      const channel = new WhatsAppChannel(opts);
+
+      await connectChannel(channel);
+
+      triggerMessages([
+        {
+          key: { id: 'voice-tts', remoteJid: 'registered@g.us', participant: '5551234@s.whatsapp.net', fromMe: false },
+          message: { audioMessage: { mimetype: 'audio/ogg; codecs=opus', ptt: true } },
+          pushName: 'Jack',
+          messageTimestamp: Math.floor(Date.now() / 1000),
+        },
+      ]);
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      // Now reply — should use TTS
+      await channel.sendMessage('registered@g.us', 'It is 3pm.');
+
+      expect(synthesizeSpeech).toHaveBeenCalledWith('It is 3pm.');
+      expect(fakeSocket.sendMessage).toHaveBeenCalledWith(
+        'registered@g.us',
+        expect.objectContaining({ mimetype: 'audio/ogg; codecs=opus', ptt: true }),
+      );
+
+      delete process.env.GROQ_API_KEY;
+      delete process.env.MINIMAX_API_KEY;
+    });
+
+    it('falls back to text when TTS fails', async () => {
+      process.env.GROQ_API_KEY = 'test-groq-key';
+      process.env.MINIMAX_API_KEY = 'test-minimax-key';
+
+      vi.mocked(downloadMediaMessage).mockResolvedValue(Buffer.from('fake-audio') as any);
+      vi.mocked(transcribeAudio).mockResolvedValue('Hello');
+      vi.mocked(synthesizeSpeech).mockRejectedValue(new Error('TTS API error'));
+
+      const opts = createTestOpts();
+      const channel = new WhatsAppChannel(opts);
+
+      await connectChannel(channel);
+
+      triggerMessages([
+        {
+          key: { id: 'voice-tts-fail', remoteJid: 'registered@g.us', participant: '5551234@s.whatsapp.net', fromMe: false },
+          message: { audioMessage: { mimetype: 'audio/ogg; codecs=opus', ptt: true } },
+          pushName: 'Karen',
+          messageTimestamp: Math.floor(Date.now() / 1000),
+        },
+      ]);
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      await channel.sendMessage('registered@g.us', 'Hello back!');
+
+      // Falls back to text
+      expect(fakeSocket.sendMessage).toHaveBeenCalledWith('registered@g.us', { text: 'Hello back!' });
+
+      delete process.env.GROQ_API_KEY;
+      delete process.env.MINIMAX_API_KEY;
+    });
+
+    it('sends text when reply contains a code block', async () => {
+      process.env.GROQ_API_KEY = 'test-groq-key';
+      process.env.MINIMAX_API_KEY = 'test-minimax-key';
+
+      vi.mocked(downloadMediaMessage).mockResolvedValue(Buffer.from('fake-audio') as any);
+      vi.mocked(transcribeAudio).mockResolvedValue('Show me some code');
+
+      const opts = createTestOpts();
+      const channel = new WhatsAppChannel(opts);
+
+      await connectChannel(channel);
+
+      triggerMessages([
+        {
+          key: { id: 'voice-code', remoteJid: 'registered@g.us', participant: '5551234@s.whatsapp.net', fromMe: false },
+          message: { audioMessage: { mimetype: 'audio/ogg; codecs=opus', ptt: true } },
+          pushName: 'Leo',
+          messageTimestamp: Math.floor(Date.now() / 1000),
+        },
+      ]);
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      await channel.sendMessage('registered@g.us', 'Here:\n```js\nconsole.log("hi");\n```');
+
+      // Should NOT call TTS (code block detected)
+      expect(synthesizeSpeech).not.toHaveBeenCalled();
+      expect(fakeSocket.sendMessage).toHaveBeenCalledWith(
+        'registered@g.us',
+        { text: 'Here:\n```js\nconsole.log("hi");\n```' },
+      );
+
+      delete process.env.GROQ_API_KEY;
+      delete process.env.MINIMAX_API_KEY;
+    });
+
+    it('sends text when reply exceeds 1500 chars', async () => {
+      process.env.GROQ_API_KEY = 'test-groq-key';
+      process.env.MINIMAX_API_KEY = 'test-minimax-key';
+
+      vi.mocked(downloadMediaMessage).mockResolvedValue(Buffer.from('fake-audio') as any);
+      vi.mocked(transcribeAudio).mockResolvedValue('Tell me everything');
+
+      const opts = createTestOpts();
+      const channel = new WhatsAppChannel(opts);
+
+      await connectChannel(channel);
+
+      triggerMessages([
+        {
+          key: { id: 'voice-long', remoteJid: 'registered@g.us', participant: '5551234@s.whatsapp.net', fromMe: false },
+          message: { audioMessage: { mimetype: 'audio/ogg; codecs=opus', ptt: true } },
+          pushName: 'Mia',
+          messageTimestamp: Math.floor(Date.now() / 1000),
+        },
+      ]);
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      const longReply = 'a'.repeat(1501);
+      await channel.sendMessage('registered@g.us', longReply);
+
+      expect(synthesizeSpeech).not.toHaveBeenCalled();
+      expect(fakeSocket.sendMessage).toHaveBeenCalledWith('registered@g.us', { text: longReply });
+
+      delete process.env.GROQ_API_KEY;
+      delete process.env.MINIMAX_API_KEY;
     });
 
     it('uses sender JID when pushName is absent', async () => {

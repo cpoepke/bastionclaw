@@ -13,6 +13,8 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 
 import { transcribeAudio } from '../transcribe.js';
+import { synthesizeSpeech } from '../tts.js';
+import { resolveGroupFolderPath } from '../group-folder.js';
 
 import { STORE_DIR } from '../config.js';
 import {
@@ -24,6 +26,14 @@ import { logger } from '../logger.js';
 import { Channel, OnInboundMessage, OnChatMetadata, RegisteredGroup } from '../types.js';
 
 const GROUP_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+const TTS_MAX_CHARS = 1500;
+
+function shouldUseTTS(text: string): boolean {
+  if (text.length > TTS_MAX_CHARS) return false; // too long — text is better
+  if (text.includes('```')) return false;         // contains code block
+  return true;
+}
 
 export interface WhatsAppChannelOpts {
   onMessage: OnInboundMessage;
@@ -41,6 +51,7 @@ export class WhatsAppChannel implements Channel {
   private outgoingQueue: Array<{ jid: string; text: string }> = [];
   private flushing = false;
   private groupSyncTimerStarted = false;
+  private pendingVoiceJids = new Set<string>();
 
   private opts: WhatsAppChannelOpts;
 
@@ -171,20 +182,39 @@ export class WhatsAppChannel implements Channel {
           let content =
             msg.message?.conversation ||
             msg.message?.extendedTextMessage?.text ||
-            msg.message?.imageMessage?.caption ||
             msg.message?.videoMessage?.caption ||
             '';
 
-          if (!content && msg.message?.audioMessage && process.env.GROQ_API_KEY) {
+          if (!content && msg.message?.audioMessage?.ptt && process.env.GROQ_API_KEY) {
             try {
               const start = Date.now();
               const buffer = await downloadMediaMessage(msg, 'buffer', {}) as Buffer;
               const transcript = await transcribeAudio(buffer);
               content = '[Voice] ' + transcript;
+              this.pendingVoiceJids.add(chatJid);
               logger.info({ duration: Date.now() - start }, 'Voice message transcribed');
             } catch (err) {
               logger.warn({ err }, 'Voice transcription failed');
               content = '[Voice message - transcription failed]';
+            }
+          }
+
+          if (!content && msg.message?.imageMessage) {
+            const caption = msg.message.imageMessage.caption || '';
+            try {
+              const buffer = await downloadMediaMessage(msg, 'buffer', {}) as Buffer;
+              const group = groups[chatJid];
+              const groupDir = resolveGroupFolderPath(group.folder);
+              const imagesDir = path.join(groupDir, 'images');
+              fs.mkdirSync(imagesDir, { recursive: true });
+              const ext = (msg.message.imageMessage.mimetype || 'image/jpeg').split('/')[1] || 'jpg';
+              const filename = `${msg.key.id}.${ext}`;
+              fs.writeFileSync(path.join(imagesDir, filename), buffer);
+              content = `[Image: images/${filename}]${caption ? '\n' + caption : ''}`;
+              logger.info({ filename }, 'Image downloaded for agent');
+            } catch (err) {
+              logger.warn({ err }, 'Failed to download image');
+              content = caption || '[Image - download failed]';
             }
           }
 
@@ -206,6 +236,20 @@ export class WhatsAppChannel implements Channel {
   }
 
   async sendMessage(jid: string, text: string): Promise<void> {
+    const useVoice = this.pendingVoiceJids.delete(jid); // atomically clear the flag
+
+    if (useVoice && process.env.MINIMAX_API_KEY && shouldUseTTS(text)) {
+      try {
+        const start = Date.now();
+        const audio = await synthesizeSpeech(text);
+        await this.sock.sendMessage(jid, { audio, mimetype: 'audio/ogg; codecs=opus', ptt: true });
+        logger.info({ jid, duration: Date.now() - start }, 'Voice reply sent');
+        return;
+      } catch (err) {
+        logger.warn({ err }, 'TTS failed, falling back to text');
+      }
+    }
+
     if (!this.connected) {
       this.outgoingQueue.push({ jid, text });
       logger.info({ jid, length: text.length, queueSize: this.outgoingQueue.length }, 'WA disconnected, message queued');
