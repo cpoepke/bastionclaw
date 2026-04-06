@@ -469,6 +469,7 @@ async function runQuery(
             BASTIONCLAW_CHAT_JID: containerInput.chatJid,
             BASTIONCLAW_GROUP_FOLDER: containerInput.groupFolder,
             BASTIONCLAW_IS_MAIN: containerInput.isMain ? '1' : '0',
+            BASTIONCLAW_IS_SCHEDULED_TASK: containerInput.isScheduledTask ? '1' : '0',
           },
         },
       },

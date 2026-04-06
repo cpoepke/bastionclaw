@@ -20,6 +20,9 @@ const RESPONSES_DIR = path.join(IPC_DIR, 'responses');
 const chatJid = process.env.BASTIONCLAW_CHAT_JID!;
 const groupFolder = process.env.BASTIONCLAW_GROUP_FOLDER!;
 const isMain = process.env.BASTIONCLAW_IS_MAIN === '1';
+// For regular queries the final result is auto-delivered via streaming — send_message
+// would cause every response to be sent twice. Only allow it for scheduled tasks.
+const isScheduledTask = process.env.BASTIONCLAW_IS_SCHEDULED_TASK === '1';
 
 function writeIpcFile(dir: string, data: object): string {
   fs.mkdirSync(dir, { recursive: true });
@@ -49,6 +52,13 @@ server.tool(
     image: z.string().optional().describe('Path to an image file to send (e.g. "bigfoot.png"). Sent alongside the text caption.'),
   },
   async (args) => {
+    // For regular (non-scheduled) queries, the final result is auto-delivered via
+    // the streaming path. Writing to IPC here would cause every response to be
+    // sent twice. Only deliver via IPC for scheduled tasks.
+    if (!isScheduledTask) {
+      return { content: [{ type: 'text' as const, text: '(skipped — regular query responses are delivered automatically via the streaming path)' }] };
+    }
+
     const data: Record<string, string | undefined> = {
       type: 'message',
       chatJid,
