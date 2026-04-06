@@ -91,3 +91,36 @@ export function getContainerRuntime(): 'container' | 'docker' {
   }
   return _detectedRuntime;
 }
+
+// Obsidian folder monitor
+// OBSIDIAN_MONITOR_MAPPINGS format: "vault/path:chatJid,vault/path:chatJid"
+export const OBSIDIAN_API_URL =
+  process.env.OBSIDIAN_API_URL ||
+  'http://obsidian-brain-mcp.obsidian-brain.svc.cluster.local:27123';
+
+export const OBSIDIAN_MONITOR_MAPPINGS: Array<{
+  vaultPath: string;
+  chatJid: string;
+}> = (process.env.OBSIDIAN_MONITOR_MAPPINGS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
+  .map((entry) => {
+    const colonIdx = entry.lastIndexOf(':');
+    if (colonIdx === -1) return null;
+    return {
+      vaultPath: entry.slice(0, colonIdx).trim(),
+      chatJid: entry.slice(colonIdx + 1).trim(),
+    };
+  })
+  .filter((e): e is { vaultPath: string; chatJid: string } => e !== null);
+
+export const OBSIDIAN_MONITOR_INTERVAL = parseInt(
+  process.env.OBSIDIAN_MONITOR_INTERVAL || '60000',
+  10,
+);
+
+export const OBSIDIAN_MONITOR_MAX_AGE_DAYS = parseInt(
+  process.env.OBSIDIAN_MONITOR_MAX_AGE_DAYS || '3',
+  10,
+);

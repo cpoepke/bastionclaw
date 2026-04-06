@@ -230,6 +230,7 @@ function readSecrets(): Record<string, string> {
     'GEMINI_API_KEY',
     'PAPERCLIP_API_KEY',
     'PAPERCLIP_API_URL',
+    'LOCAL_REST_API_KEY',
   ];
   const secrets: Record<string, string> = {};
   const content = fs.readFileSync(envFile, 'utf-8');

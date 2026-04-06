@@ -115,6 +115,13 @@ function createSchema(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_insights_source_count ON insights(source_count DESC);
     CREATE INDEX IF NOT EXISTS idx_insights_group ON insights(group_folder);
     CREATE INDEX IF NOT EXISTS idx_insight_links_source ON insight_source_links(source_id);
+
+    CREATE TABLE IF NOT EXISTS obsidian_seen_files (
+      vault_path TEXT NOT NULL,
+      file_path  TEXT NOT NULL,
+      first_seen TEXT NOT NULL,
+      PRIMARY KEY (vault_path, file_path)
+    );
   `);
 
   // Add context_mode column if it doesn't exist (migration for existing DBs)
@@ -1148,6 +1155,21 @@ export function getInsightActivity(groupFolder: string): {
     avgSourcesPerInsight,
     lastRefresh: lastRefreshRow.last_refresh,
   };
+}
+
+// --- Obsidian seen files ---
+
+export function getSeenFiles(vaultPath: string): Set<string> {
+  const rows = db
+    .prepare('SELECT file_path FROM obsidian_seen_files WHERE vault_path = ?')
+    .all(vaultPath) as Array<{ file_path: string }>;
+  return new Set(rows.map((r) => r.file_path));
+}
+
+export function markFileSeen(vaultPath: string, filePath: string): void {
+  db.prepare(
+    `INSERT OR IGNORE INTO obsidian_seen_files (vault_path, file_path, first_seen) VALUES (?, ?, ?)`,
+  ).run(vaultPath, filePath, new Date().toISOString());
 }
 
 // --- JSON migration ---
