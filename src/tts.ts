@@ -19,7 +19,7 @@ export async function synthesizeSpeech(text: string): Promise<Buffer> {
       text,
       stream: false,
       voice_setting: {
-        voice_id: 'Podcast_male_en',
+        voice_id: 'English_ManWithDeepVoice',
         speed: 1.0,
         vol: 1.0,
         pitch: 0,

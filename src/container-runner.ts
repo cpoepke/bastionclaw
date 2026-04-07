@@ -128,27 +128,54 @@ function buildVolumeMounts(
     '.claude',
   );
   fs.mkdirSync(groupSessionsDir, { recursive: true });
+  // Ensure the agent container (runs as 'node' uid 1000) can write to this directory.
+  // nanoclaw runs as root, so created dirs are root:root by default.
+  try {
+    fs.chmodSync(groupSessionsDir, 0o777);
+  } catch {
+    /* non-fatal: may fail in test environments */
+  }
+
   const settingsFile = path.join(groupSessionsDir, 'settings.json');
-  if (!fs.existsSync(settingsFile)) {
+
+  // Read existing settings to preserve manually configured fields (e.g. mcpServers).
+  let existingSettings: Record<string, unknown> = {};
+  if (fs.existsSync(settingsFile)) {
+    try {
+      existingSettings = JSON.parse(fs.readFileSync(settingsFile, 'utf-8'));
+    } catch {
+      /* invalid JSON — will rewrite */
+    }
+  }
+
+  const existingEnv = (existingSettings.env as Record<string, string>) ?? {};
+  const missingApiKey =
+    !existingEnv.ANTHROPIC_API_KEY &&
+    !existingEnv.CLAUDE_CODE_OAUTH_TOKEN &&
+    !!process.env.ANTHROPIC_API_KEY;
+
+  if (!fs.existsSync(settingsFile) || missingApiKey) {
+    const settingsEnv: Record<string, string> = {
+      ...existingEnv,
+      // Enable agent swarms (subagent orchestration)
+      // https://code.claude.com/docs/en/agent-teams#orchestrate-teams-of-claude-code-sessions
+      CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
+      // Load CLAUDE.md from additional mounted directories
+      // https://code.claude.com/docs/en/memory#load-memory-from-additional-directories
+      CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
+      // Enable Claude's memory feature (persists user preferences between sessions)
+      // https://code.claude.com/docs/en/memory#manage-auto-memory
+      CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
+    };
+    // Propagate API auth from host environment so all groups can authenticate
+    if (process.env.ANTHROPIC_BASE_URL)
+      settingsEnv.ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL;
+    if (process.env.ANTHROPIC_API_KEY)
+      settingsEnv.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+
     fs.writeFileSync(
       settingsFile,
-      JSON.stringify(
-        {
-          env: {
-            // Enable agent swarms (subagent orchestration)
-            // https://code.claude.com/docs/en/agent-teams#orchestrate-teams-of-claude-code-sessions
-            CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-            // Load CLAUDE.md from additional mounted directories
-            // https://code.claude.com/docs/en/memory#load-memory-from-additional-directories
-            CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
-            // Enable Claude's memory feature (persists user preferences between sessions)
-            // https://code.claude.com/docs/en/memory#manage-auto-memory
-            CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
-          },
-        },
-        null,
-        2,
-      ) + '\n',
+      JSON.stringify({ ...existingSettings, env: settingsEnv }, null, 2) + '\n',
     );
   }
 
@@ -706,10 +733,9 @@ export function writeTasksSnapshot(
   const groupIpcDir = path.join(DATA_DIR, 'ipc', groupFolder);
   fs.mkdirSync(groupIpcDir, { recursive: true });
 
-  // Main sees all tasks, others only see their own
-  const filteredTasks = isMain
-    ? tasks
-    : tasks.filter((t) => t.groupFolder === groupFolder);
+  // All groups see all tasks so agents can answer questions about scheduled tasks
+  // regardless of which group they're running in.
+  const filteredTasks = tasks;
 
   const tasksFile = path.join(groupIpcDir, 'current_tasks.json');
   fs.writeFileSync(tasksFile, JSON.stringify(filteredTasks, null, 2));
