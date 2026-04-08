@@ -246,9 +246,6 @@ function buildVolumeMounts(
  * This is the ONLY path for secrets into containers — nothing is mounted as files.
  */
 function readSecrets(): Record<string, string> {
-  const envFile = path.join(process.cwd(), '.env');
-  if (!fs.existsSync(envFile)) return {};
-
   // SDK auth + API keys needed by agent Bash tool calls
   const allowedVars = [
     'CLAUDE_CODE_OAUTH_TOKEN',
@@ -258,7 +255,20 @@ function readSecrets(): Record<string, string> {
     'PAPERCLIP_API_KEY',
     'PAPERCLIP_API_URL',
     'LOCAL_REST_API_KEY',
+    'GITHUB_TOKEN',
   ];
+
+  const envFile = path.join(process.cwd(), '.env');
+  if (!fs.existsSync(envFile)) {
+    // In K8s, secrets are injected via env_from (Infisical operator) — fall back to process.env
+    const secrets: Record<string, string> = {};
+    for (const key of allowedVars) {
+      const val = process.env[key];
+      if (val) secrets[key] = val;
+    }
+    return secrets;
+  }
+
   const secrets: Record<string, string> = {};
   const content = fs.readFileSync(envFile, 'utf-8');
 
