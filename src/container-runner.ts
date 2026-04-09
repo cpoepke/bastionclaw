@@ -229,10 +229,11 @@ function buildVolumeMounts(
   // Per-group IPC namespace: each group gets its own IPC directory
   // This prevents cross-group privilege escalation via IPC
   const groupIpcDir = path.join(DATA_DIR, 'ipc', group.folder);
-  fs.mkdirSync(path.join(groupIpcDir, 'messages'), { recursive: true });
-  fs.mkdirSync(path.join(groupIpcDir, 'tasks'), { recursive: true });
-  fs.mkdirSync(path.join(groupIpcDir, 'input'), { recursive: true });
-  fs.mkdirSync(path.join(groupIpcDir, 'responses'), { recursive: true });
+  for (const sub of ['messages', 'tasks', 'input', 'responses']) {
+    fs.mkdirSync(path.join(groupIpcDir, sub), { recursive: true });
+    try { fs.chownSync(path.join(groupIpcDir, sub), 1000, 1000); } catch { /* non-fatal */ }
+  }
+  try { fs.chownSync(groupIpcDir, 1000, 1000); } catch { /* non-fatal */ }
   mounts.push({
     hostPath: groupIpcDir,
     containerPath: '/workspace/ipc',
