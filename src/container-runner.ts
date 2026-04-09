@@ -336,6 +336,10 @@ function buildContainerArgs(
     // Docker: cgroup-based PID limit and privilege escalation prevention
     args.push('--pids-limit', '256');
     args.push('--security-opt', 'no-new-privileges:true');
+    // Share the host pod's network namespace so agent containers can reach
+    // K8s cluster-internal services (e.g. obsidian-brain MCP at port 3001).
+    // Without this, DinD bridge networking blocks cluster service access.
+    args.push('--network', 'host');
   } else {
     // Apple Container: VM isolation handles privilege escalation;
     // use ulimit for process count limit (--pids-limit not supported)

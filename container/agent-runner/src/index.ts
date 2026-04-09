@@ -456,6 +456,7 @@ async function runQuery(
         'TodoWrite', 'ToolSearch', 'Skill',
         'NotebookEdit',
         'mcp__bastionclaw__*',
+        'mcp__obsidian-brain__*',
       ],
       env: sdkEnv,
       permissionMode: 'bypassPermissions',
