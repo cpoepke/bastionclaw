@@ -14,14 +14,17 @@ groups/*
 !groups/main/
 !groups/global/
 !groups/brain-maintenance/
+!groups/research-reports/
 groups/main/*
 groups/global/*
 groups/brain-maintenance/*
+groups/research-reports/*
 !groups/main/CLAUDE.md
 !groups/global/CLAUDE.md
 !groups/brain-maintenance/CLAUDE.md
 !groups/brain-maintenance/SETUP.md
 !groups/brain-maintenance/prompts/
+!groups/research-reports/CLAUDE.md
 
 # Secrets
 *.keys.json

@@ -179,9 +179,32 @@ function buildVolumeMounts(
     if (process.env.ANTHROPIC_API_KEY)
       settingsEnv.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
+    // Propagate MCP servers from environment (e.g. obsidian-brain)
+    const mcpServers: Record<string, unknown> = {
+      ...((existingSettings.mcpServers as Record<string, unknown>) ?? {}),
+    };
+    const obsidianMcpApiKey = process.env.OBSIDIAN_MCP_API_KEY;
+    if (obsidianMcpApiKey && !mcpServers['obsidian-brain']) {
+      mcpServers['obsidian-brain'] = {
+        type: 'http',
+        url: 'http://obsidian-brain-mcp.obsidian-brain.svc.cluster.local:3001/mcp',
+        headers: {
+          Authorization: `Bearer ${obsidianMcpApiKey}`,
+        },
+      };
+    }
+
+    const settingsToWrite: Record<string, unknown> = {
+      ...existingSettings,
+      env: settingsEnv,
+    };
+    if (Object.keys(mcpServers).length > 0) {
+      settingsToWrite.mcpServers = mcpServers;
+    }
+
     fs.writeFileSync(
       settingsFile,
-      JSON.stringify({ ...existingSettings, env: settingsEnv }, null, 2) + '\n',
+      JSON.stringify(settingsToWrite, null, 2) + '\n',
     );
   }
 

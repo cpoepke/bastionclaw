@@ -23,6 +23,7 @@ import { registerDebugRoutes } from './api/debug.js';
 import { registerMemoryRoutes } from './api/memory.js';
 import { registerInsightRoutes } from './api/insights.js';
 import { registerYouTubeRoutes } from './api/youtube.js';
+import { registerHookRoutes } from './api/hooks.js';
 import { addClient } from './ws.js';
 
 export interface ServerDeps {
@@ -71,6 +72,7 @@ export async function startWebServer(deps: ServerDeps): Promise<void> {
   registerMemoryRoutes(app);
   registerInsightRoutes(app);
   registerYouTubeRoutes(app);
+  registerHookRoutes(app, deps);
 
   // WebSocket endpoint
   app.register(async (wsApp) => {
