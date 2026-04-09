@@ -130,10 +130,16 @@ function buildVolumeMounts(
   fs.mkdirSync(groupSessionsDir, { recursive: true });
   // Ensure the agent container (runs as 'node' uid 1000) can write to this directory.
   // nanoclaw runs as root, so created dirs are root:root by default.
+  // In K8s, some PVC filesystems silently ignore chmod — use chown instead.
   try {
-    fs.chmodSync(groupSessionsDir, 0o777);
+    fs.chownSync(groupSessionsDir, 1000, 1000);
   } catch {
     /* non-fatal: may fail in test environments */
+  }
+  try {
+    fs.chmodSync(groupSessionsDir, 0o755);
+  } catch {
+    /* non-fatal */
   }
 
   const settingsFile = path.join(groupSessionsDir, 'settings.json');
