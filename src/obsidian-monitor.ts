@@ -82,6 +82,12 @@ async function checkFolder(
   const data = (await response.json()) as { files: string[] };
   const files = data.files || [];
 
+  // Recurse into subdirectories (Obsidian API returns non-recursive listings)
+  const subdirs = files.filter((f) => f.endsWith('/'));
+  for (const subdir of subdirs) {
+    await checkFolder(`${vaultPath}/${subdir.slice(0, -1)}`, chatJid, apiKey, deps);
+  }
+
   // Filter to .md files only
   const mdFiles = files.filter((f) => f.endsWith('.md'));
 
